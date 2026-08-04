@@ -1,6 +1,9 @@
 import json
 import os
 import boto3
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 from twilio.rest import Client
 from typing import Dict, Any, Optional
 from enum import Enum
@@ -127,6 +130,7 @@ class EmailService:
         self.company_name = os.environ.get('COMPANY_NAME', 'FBP')
         self.base_url = os.environ.get('BASE_URL', 'https://my-fbp.com')
         self.support_email = os.environ.get('SUPPORT_EMAIL', 'fbpadmin@my-fbp.com')
+        self.s3_bucket = os.environ.get("S3BucketName", "my-fbp.com")
 
     @tracer.capture_method
     def send(self, message_type: str, channel: str, recipient: Optional[str],
@@ -138,12 +142,23 @@ class EmailService:
 
             match msg_enum:
                 case MessageType.WELCOME:
-                    if not recipient or '@' not in recipient:
-                        raise ValueError("Valid recipient email is required for welcome emails")
-                    data['user_name'] = self._get_user_first_name(recipient) or recipient
-                    msg_id = self._send_one(recipient, content_generator, data, message_type)
-                    return MessagingResponse(success=True, channel="email", message_type=message_type,
-                                            recipient=recipient, message_id=msg_id)
+                    if not recipient or "@" not in recipient:
+                        raise ValueError(
+                            "Valid recipient email is required for welcome emails"
+                        )
+                    data["user_name"] = (
+                        self._get_user_first_name(recipient) or recipient
+                    )
+                    msg_id = self._send_one(
+                        recipient, content_generator, data, message_type
+                    )
+                    return MessagingResponse(
+                        success=True,
+                        channel="email",
+                        message_type=message_type,
+                        recipient=recipient,
+                        message_id=msg_id,
+                    )
 
                 case MessageType.REMINDER:
                     users = self._get_bulk_users('emailReminders', channel="email")
@@ -171,7 +186,8 @@ class EmailService:
                         logger.info("No gridsheet users found")
                     for user in users:
                         user_data = {**data, "user_name": user.get("firstName") or user["email"]}
-                        self._send_one(user["email"], content_generator, user_data, message_type)
+                        pdf_bytes = boto3.client('s3').get_object(Bucket=self.s3_bucket, Key='pdfs/gridsheet_week_9_2026.pdf')['Body'].read()
+                        self._send_one(recipient=user["email"], content_generator=content_generator, data=user_data, message_type=message_type, pdf_bytes=pdf_bytes, pdf_filename="gridsheet_week_9_2026.pdf")
                     return MessagingResponse(success=True, channel="email", message_type=message_type,
                                             recipient=recipient, message_id=f"bulk:{len(users)}")
 
@@ -251,20 +267,30 @@ class EmailService:
         logger.info("Unsupported channel; no bulk recipients")
         return []
 
-    def _send_one(self, recipient: str, content_generator, data: Dict[str, Any], message_type: str) -> str:
+    def _send_one(self, recipient: str, content_generator, data: Dict[str, Any], message_type: str,
+                  pdf_bytes: Optional[bytes] = None, pdf_filename: Optional[str] = None) -> str:
         subject, html_content, text_content = content_generator(data)
-        send_args = {
-            'Source': self.default_sender,
-            'Destination': {'ToAddresses': [recipient]},
-            'Message': {
-                'Subject': {'Data': subject, 'Charset': 'UTF-8'},
-                'Body': {
-                    'Html': {'Data': html_content, 'Charset': 'UTF-8'},
-                    'Text': {'Data': text_content, 'Charset': 'UTF-8'}
-                }
-            }
-        }
-        response = self.ses_client.send_email(**send_args)
+
+        msg = MIMEMultipart('mixed')
+        msg['Subject'] = subject
+        msg['From'] = self.default_sender
+        msg['To'] = recipient
+
+        body = MIMEMultipart('alternative')
+        body.attach(MIMEText(text_content, 'plain', 'utf-8'))
+        body.attach(MIMEText(html_content, 'html', 'utf-8'))
+        msg.attach(body)
+
+        if pdf_bytes:
+            part = MIMEApplication(pdf_bytes, Name=pdf_filename)
+            part['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
+            msg.attach(part)
+
+        response = self.ses_client.send_raw_email(
+            Source=self.default_sender,
+            Destinations=[recipient],
+            RawMessage={'Data': msg.as_string()}
+        )
         message_id = response['MessageId']
         logger.info("Email sent", extra={"message_id": message_id, "recipient": recipient, "message_type": message_type})
         metrics.add_metric(name="EmailsSent", unit=MetricUnit.Count, value=1)
@@ -401,8 +427,6 @@ class EmailService:
         subject = f"A message from {self.company_name}"
         text = f"Hi {user_name},\nBest regards,\n{self.company_name}"
         return subject, html_content, text
-
- 
 
 
 # ---------------------------------------------------------------------------

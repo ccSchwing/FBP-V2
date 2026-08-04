@@ -426,6 +426,23 @@
         }
       ]
     },
+   {
+      "name": "Python: Attach to AdvancedMessagingService Gridsheet Attachment",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Attach to AdvancedMessagingService Gridsheet Attachment",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/AdvancedMessagingService/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },
     {
       "name": "Python: Attach to AdvancedMessagingService Welcome",
       "type": "debugpy",
