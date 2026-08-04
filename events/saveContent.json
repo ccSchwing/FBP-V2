@@ -1,0 +1,9 @@
+{
+  "httpMethod": "POST",
+  "path": "/save-content",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": "{\"content\": \"<html><body><h1>Debug SaveContent</h1><p>Sample payload for local invoke.</p></body></html>\", \"url\": \"https://example.com/debug-save-content.html\", \"timestamp\": \"2025-09-22T12:00:00Z\", \"userAgent\": \"VSCode-SAM-Debug\"}",
+  "isBase64Encoded": false
+}

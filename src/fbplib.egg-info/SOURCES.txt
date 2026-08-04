@@ -1,0 +1,14 @@
+pyproject.toml
+../FBPLib/__init__.py
+../FBPLib/decimalDefault.py
+../FBPLib/fbpLog.py
+../FBPLib/getCurrentWeek.py
+../FBPLib-Layer/fbplib/__init__.py
+../FBPLib-Layer/fbplib/decimalDefault.py
+../FBPLib-Layer/fbplib/fbpLog.py
+../FBPLib-Layer/fbplib/getCurrentWeek.py
+../fbplib.egg-info/PKG-INFO
+../fbplib.egg-info/SOURCES.txt
+../fbplib.egg-info/dependency_links.txt
+../fbplib.egg-info/requires.txt
+../fbplib.egg-info/top_level.txt

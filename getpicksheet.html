@@ -1,0 +1,1060 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GetPickSheet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="/js-lib/oidc-client-ts.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+  <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+  <script type="module">
+    import { auth } from "/js/auth.js";
+    await auth.ensureAuthenticated();
+    const user = await auth.getUser();
+    if (user && user.profile && user.profile.email) {
+      const userEmail = user.profile.email;
+      window.userEmail = userEmail; // make it global for convenience
+    }
+    console.log("Authenticated user:", user);
+    window.user = user;
+
+    // Now call getUserStatus after user is loaded
+    const { getUserStatus } = await import("/js-lib/userUtils.js");
+    await getUserStatus();
+  </script>
+  <script type="module">
+    import { getCurrentWeek } from "/js-lib/fbpUtils.js";
+    // Removed local getCurrentWeek function since it's now imported from fbpUtils.js
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      try {
+        const currentWeek = await getCurrentWeek();
+        document.getElementById("current-week").textContent = currentWeek;
+        console.log("Current week data:", currentWeek);
+      } catch (error) {
+        console.error("Error fetching current week data:", error);
+        alert("Failed to load current week data. Please try again later.");
+      }
+    });
+  </script>
+  <style>
+    table th,
+    table td {
+      border: none;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 5px 10px;
+    }
+
+    table {
+      width: auto;
+      border-collapse: collapse;
+      margin-top: 8px;
+      margin-bottom: 8px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.13), 0 1.5px 4px rgba(76, 175, 80, 0.08);
+      border: 1.5px solid #c8e6c9;
+    }
+
+    #picksheet tbody tr {
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+
+    #picksheet tbody tr:hover {
+      background: rgba(76, 175, 80, 0.07) !important;
+      box-shadow: inset 3px 0 0 #4caf50;
+    }
+
+    @keyframes shimmer {
+      0% {
+        background-position: 200% 0;
+      }
+
+      100% {
+        background-position: -200% 0;
+      }
+    }
+
+    #picksheet table {
+      visibility: hidden;
+    }
+
+    #picksheet table th {
+      background-color: #4caf50;
+      color: white;
+      font-weight: bold;
+    }
+
+    #infoBanner {
+      display: visible;
+      margin: 8px 0 12px;
+      padding: 8px 10px;
+      border: 1px solid #0c5b63;
+      background: #fff9db;
+      color: #210c78;
+      font-size: 0.92rem;
+      width: fit-content;
+    }
+
+    #loadingSpinner {
+      display: none;
+      text-align: center;
+      margin: 2rem 0;
+    }
+
+    #loadingSpinner::after {
+      content: "";
+      display: inline-block;
+      width: 48px;
+      height: 48px;
+      border: 5px solid #ccc;
+      border-top-color: #4caf50;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+  <script type="module">
+    import { getPicks, renderPickSheet } from "/js-lib/picksheetUtils.js";
+    import { getServiceUrl } from "/js-lib/urlConfig.js";
+
+    function setDiagnostics(message = "") {
+      const bannerEl = document.getElementById("diagnosticsBanner");
+      if (!bannerEl) {
+        return;
+      }
+
+      if (!message) {
+        bannerEl.textContent = "";
+        bannerEl.style.display = "none";
+        return;
+      }
+
+      const traceId = new Date()
+        .toISOString()
+        .replace(/[\-:.TZ]/g, "")
+        .slice(0, 14);
+      bannerEl.textContent = `${message} (trace: ${traceId})`;
+      bannerEl.style.display = "block";
+    }
+
+    function setLoadingSpinnerVisible(isVisible) {
+      const spinnerEl = document.getElementById("loadingSpinner");
+      const picksheetForm = document.getElementById("picksheet");
+      if (!spinnerEl) {
+        return;
+      }
+
+      spinnerEl.style.display = isVisible ? "block" : "none";
+      spinnerEl.setAttribute("aria-hidden", isVisible ? "false" : "true");
+      if (picksheetForm) {
+        picksheetForm.setAttribute("aria-busy", isVisible ? "true" : "false");
+      }
+    }
+
+    function formatSavedAt(savedAtValue) {
+      if (!savedAtValue) {
+        return "";
+      }
+
+      const date = new Date(savedAtValue);
+      if (Number.isNaN(date.getTime())) {
+        return "";
+      }
+
+      return date.toLocaleString();
+    }
+
+    function setLastSavedAt(savedAtValue) {
+      const lastSavedEl = document.getElementById("lastSavedAt");
+      if (!lastSavedEl) {
+        return;
+      }
+
+      const formatted = formatSavedAt(savedAtValue);
+      lastSavedEl.textContent = formatted ? `Last saved: ${formatted}` : "";
+    }
+
+    function renderPickSheetSkeleton(rowCount = 8) {
+      const rows = [];
+      for (let i = 0; i < rowCount; i += 1) {
+        rows.push(`
+              <tr>
+                <td class="skeleton-cell"><span class="skeleton-line" style="width: 96px;"></span></td>
+                <td class="skeleton-cell"><span class="skeleton-line" style="width: 132px;"></span></td>
+                <td class="skeleton-cell"><span class="skeleton-line" style="width: 132px;"></span></td>
+                <td class="skeleton-cell"><span class="skeleton-line" style="width: 70px;"></span></td>
+                <td class="skeleton-cell"><span class="skeleton-line" style="width: 44px;"></span></td>
+              </tr>
+            `);
+      }
+      return rows.join("");
+    }
+
+    function normalizeScheduleRows(payload) {
+      let parsed = payload;
+
+      if (typeof parsed === "string") {
+        parsed = JSON.parse(parsed);
+      }
+
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed) &&
+        "body" in parsed
+      ) {
+        parsed = parsed.body;
+        if (typeof parsed === "string") {
+          parsed = JSON.parse(parsed);
+        }
+      }
+
+      const rows = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+      return rows
+        .map((row) => (typeof row === "string" ? JSON.parse(row) : row))
+        .filter((row) => row && typeof row === "object");
+    }
+
+    async function fetchWeeklySchedule() {
+      const urlKey = "getSchedule";
+      const serviceUrl = await getServiceUrl(urlKey);
+      const response = await fetch(serviceUrl, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch weekly schedule data with status ${response.status}`,
+        );
+      } else {
+        const data = await response.json();
+        if (!data) {
+          throw new Error("Received empty data for weekly schedule.");
+        }
+        console.log("Fetched weekly schedule data:", data);
+        return data;
+      }
+    }
+
+    //
+    async function fetchCurrentUserPicks() {
+      const urlKey = "getFBPPicksForUserPython";
+      const serviceUrl = await getServiceUrl(urlKey);
+      const response = await fetch(serviceUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: window.userEmail }),
+      });
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch pick sheet data for ${window.userEmail}:status:${response.status}`,
+        );
+      } else {
+        const data = await response.json();
+        console.log(`Fetched picks for user ${window.userEmail}:`, data);
+        if (!data) {
+          return { picks: "", tieBreaker: "" };
+        }
+
+        const parsed = typeof data === "string" ? JSON.parse(data) : data;
+        console.log(`Fetched picks for user ${window.userEmail}:`, parsed);
+        return {
+          picks: parsed?.picks ?? "",
+          tieBreaker: parsed?.tieBreaker ?? "",
+          savedAt: parsed?.savedAt ?? "",
+        };
+      }
+    }
+
+    function getUniqueGameIds(form) {
+      const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+      const gameIds = [];
+      const seen = new Set();
+
+      for (const checkbox of checkboxes) {
+        if (!seen.has(checkbox.name)) {
+          seen.add(checkbox.name);
+          gameIds.push(checkbox.name);
+        }
+      }
+
+      return gameIds;
+    }
+
+    function applyUserPicksToForm(savedPicksData) {
+      const form = document.getElementById("picksheet");
+      if (!form) {
+        return;
+      }
+
+      const picksString = String(savedPicksData?.picks ?? "");
+      const gameNames = getUniqueGameIds(form);
+
+      for (let i = 0; i < gameNames.length; i += 1) {
+        const pickValue = picksString[i];
+        if (pickValue !== "A" && pickValue !== "H") {
+          continue;
+        }
+
+        const target = form.querySelector(
+          `input[type="checkbox"][name="${CSS.escape(gameNames[i])}"][value="${pickValue}"]`,
+        );
+        if (target) {
+          target.checked = true;
+        }
+      }
+
+      const tieBreakerInput = document.getElementById(
+        "mondayNightTieBreaker",
+      );
+      if (tieBreakerInput) {
+        tieBreakerInput.value = savedPicksData?.tieBreaker
+          ? String(savedPicksData.tieBreaker)
+          : "";
+      }
+
+      if (savedPicksData?.savedAt) {
+        setLastSavedAt(savedPicksData.savedAt);
+      } else {
+        setLastSavedAt("");
+      }
+
+      refreshAllSelectionHighlights();
+    }
+    function updateGameSelectionHighlight(form, gameId) {
+      if (!form || !gameId) {
+        return;
+      }
+
+      const awayRadio = form.querySelector(
+        `input[type="checkbox"][name="${CSS.escape(gameId)}"][value="A"]`,
+      );
+      const homeRadio = form.querySelector(
+        `input[type="checkbox"][name="${CSS.escape(gameId)}"][value="H"]`,
+      );
+      if (!awayRadio || !homeRadio) {
+        return;
+      }
+
+      const checkboxRow = awayRadio.closest("tr");
+      if (!checkboxRow) {
+        return;
+      }
+
+      const nameRow = checkboxRow.nextElementSibling;
+
+      const awayCells = [awayRadio.closest("td")];
+      const homeCells = [homeRadio.closest("td")];
+
+      if (nameRow && nameRow.children.length >= 3) {
+        awayCells.push(nameRow.children[1]);
+        homeCells.push(nameRow.children[2]);
+      }
+
+      awayCells.forEach((cell) => {
+        if (cell) {
+          cell.classList.remove("team-selected");
+        }
+      });
+      homeCells.forEach((cell) => {
+        if (cell) {
+          cell.classList.remove("team-selected");
+        }
+      });
+
+      const selectedValue = awayRadio.checked
+        ? "A"
+        : homeRadio.checked
+          ? "H"
+          : "";
+
+      if (selectedValue === "A") {
+        awayCells.forEach((cell) => {
+          if (cell) {
+            cell.classList.add("team-selected");
+          }
+        });
+      }
+
+      if (selectedValue === "H") {
+        homeCells.forEach((cell) => {
+          if (cell) {
+            cell.classList.add("team-selected");
+          }
+        });
+      }
+    }
+
+    function refreshAllSelectionHighlights() {
+      const form = document.getElementById("picksheet");
+      if (!form) {
+        return;
+      }
+
+      const gameIds = getUniqueGameIds(form);
+
+      for (const gameId of gameIds) {
+        updateGameSelectionHighlight(form, gameId);
+      }
+    }
+
+    function wireSelectionHighlighting() {
+      const form = document.getElementById("picksheet");
+      if (!form) {
+        return;
+      }
+
+      form.addEventListener("change", (event) => {
+        const target = event.target;
+        if (!target || target.tagName !== "INPUT") {
+          return;
+        }
+        if (target.type !== "checkbox") {
+          return;
+        }
+
+        updateGameSelectionHighlight(form, target.name);
+      });
+    }
+
+    function checkAllAwayTeams() {
+      const form = document.getElementById("picksheet");
+      if (!form) {
+        return;
+      }
+      clearMyPicks();
+      const gameNames = getUniqueGameIds(form);
+
+      for (let i = 0; i < gameNames.length; i += 1) {
+        const target = form.querySelector(
+          `input[type="checkbox"][name="${CSS.escape(gameNames[i])}"][value="A"]`,
+        );
+        if (target) {
+          target.checked = true;
+        }
+      }
+    }
+    function checkAllFavorites() {
+      const form = document.getElementById("picksheet");
+      if (!form) {
+        return;
+      }
+
+      const gameNames = getUniqueGameIds(form);
+
+      for (let i = 0; i < gameNames.length; i += 1) {
+        const gameId = gameNames[i];
+        if (document.getElementById(`${gameId}-H-spread`)) {
+          console.log(`Found favorite cell for home team of game ${gameId}`);
+          document.getElementById(`${gameId}A`).checked = true;
+          document.getElementById(`${gameId}H`).checked = false;
+        }
+        if (document.getElementById(`${gameId}-A-spread`)) {
+          console.log(`Found favorite cell for away team of game ${gameId}`);
+          document.getElementById(`${gameId}H`).checked = true;
+          document.getElementById(`${gameId}A`).checked = false;
+        }
+        refreshAllSelectionHighlights();
+      }
+    }
+    function clearMyPicks() {
+      const form = document.getElementById("picksheet");
+      if (!form) {
+        return;
+      }
+      const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach((checkbox) => (checkbox.checked = false));
+      const tieBreakerInput = document.getElementById(
+        "mondayNightTieBreaker",
+      );
+      if (tieBreakerInput) {
+        tieBreakerInput.value = "";
+      }
+
+      refreshAllSelectionHighlights();
+    }
+    function checkAllUnderdogs() {
+      console.log("Checking all underdogs");
+      const form = document.getElementById("picksheet");
+      if (!form) {
+        return;
+      }
+
+      const gameNames = getUniqueGameIds(form);
+
+      for (let i = 0; i < gameNames.length; i += 1) {
+        const gameId = gameNames[i];
+        if (document.getElementById(`${gameId}-H-spread`)) {
+          console.log(`Found underdog cell for home team of game ${gameId}`);
+          document.getElementById(`${gameId}A`).checked = false;
+          document.getElementById(`${gameId}H`).checked = true;
+        }
+        if (document.getElementById(`${gameId}-A-spread`)) {
+          console.log(`Found underdog cell for away team of game ${gameId}`);
+          document.getElementById(`${gameId}H`).checked = false;
+          document.getElementById(`${gameId}A`).checked = true;
+        }
+      }
+
+      refreshAllSelectionHighlights();
+    }
+    function checkAllRandom() {
+      const form = document.getElementById("picksheet");
+      if (!form) {
+        return;
+      }
+      clearMyPicks();
+      const gameNames = getUniqueGameIds(form);
+
+      for (let i = 0; i < gameNames.length; i += 1) {
+        const gameId = gameNames[i];
+        const randomSide = Math.random() < 0.5 ? "A" : "H";
+
+        const target = form.querySelector(
+          `input[type="checkbox"][name="${CSS.escape(gameId)}"][value="${randomSide}"]`,
+        );
+        if (target) {
+          target.checked = true;
+        }
+      }
+      const tieBreaker = document.getElementById(
+        "mondayNightTieBreaker",
+      );
+      tieBreaker.value = Math.floor(Math.random() * 50) + 21; // Between 21 and 70
+      refreshAllSelectionHighlights();
+    }
+
+    function checkAllHomeTeams() {
+      const form = document.getElementById("picksheet");
+      if (!form) {
+        return;
+      }
+      clearMyPicks();
+      const gameNames = getUniqueGameIds(form);
+
+      for (let i = 0; i < gameNames.length; i += 1) {
+        const target = form.querySelector(
+          `input[type="checkbox"][name="${CSS.escape(gameNames[i])}"][value="H"]`,
+        );
+        if (target) {
+          target.checked = true;
+        }
+      }
+
+      refreshAllSelectionHighlights();
+    }
+
+    //
+    function registerSavePicksHandler() {
+      const savePicksButton = document.getElementById("savePicks");
+      if (!savePicksButton) {
+        console.error("savePicks button not found; cannot register handler.");
+        return;
+      }
+
+      if (savePicksButton.dataset.bound === "true") {
+        return;
+      }
+
+      savePicksButton.dataset.bound = "true";
+      const defaultSaveLabel =
+        savePicksButton.textContent || "Save Your Picks";
+      savePicksButton.addEventListener("click", async () => {
+        if (savePicksButton.disabled) {
+          return;
+        }
+
+        const picks = getPicks("picksheet");
+        if (picks == null) {
+          console.log("Save cancelled because picks were not confirmed.");
+          return;
+        }
+
+        const tieBreakerInput = document.getElementById(
+          "mondayNightTieBreaker",
+        );
+        // If picks contains only ? then we can allow empty tieBreaker, otherwise require it to be a number between 2 and 150.
+        let tieBreakerValue = tieBreakerInput ? tieBreakerInput.value.trim() : "";
+        let noPicksMade = false;
+        let notAllPicksMade = false;
+        for (let i = 0; i < picks.length; i += 1) {
+          const pick = picks[i];
+          if (pick === "?") {
+            noPicksMade = true;
+            notAllPicksMade = true
+          } else {
+            notAllPicksMade = notAllPicksMade;  // Just leave it alone.  You already for a ?
+          }
+        }
+
+        // If noPicksMade is false, the user has cleared their picks.  Allow a blank tieBreaker in the form.
+
+        if (notAllPicksMade) {
+          const proceed = confirm(
+            "Do you want to save your picks with some games left unpicked? If you click OK, we will save your current picks and fill in the rest with our default algorithm. You can come back before the pool closes to change any of your picks. If you click Cancel, you can go back and complete your picks before saving.",
+          );
+          if (!proceed) {
+            return;
+          } else {
+            // See if there's a tieBreaker value. Allow it to be blank, but check it for validity.
+
+            if (
+              tieBreakerValue === "" ||
+              Number(tieBreakerValue) >= 2 ||
+              Number(tieBreakerValue) <= 150
+            ) {
+              // It's valid, do nothing, but with style.
+            } else {
+              alert("Enter either a valid tiebreaker value between 2 and 150, or leave it blank to use the default algorithm for tiebreakers.");
+              return;
+            }
+            // If no tieBreaker value, set it to 0 so the backend knows to fill it in with the default algorithm.
+            if (!tieBreakerValue) {
+              tieBreakerValue = 0;
+            }
+          }
+          if (noPicksMade) {
+            tieBreakerValue = 0
+          } else {
+            // If picks are made, require a valid tieBreaker.
+            const tieBreakerNumber = Number(tieBreakerValue);
+            if (
+              !tieBreakerValue ||
+              Number.isNaN(tieBreakerNumber) ||
+              tieBreakerNumber < 2 ||
+              tieBreakerNumber > 150
+            ) {
+              alert(
+                "Please enter a valid tiebreaker value between 2 and 150 before saving your picks.",
+              );
+              return;
+            }
+          }
+        }
+
+
+        const payload = {
+          email: window.userEmail,
+          picks,
+          tieBreaker: tieBreakerValue,
+        };
+
+        const savePicksUrl = await getServiceUrl("savePicks");
+        if (payload.picks.includes("?")) {
+          const proceed = confirm(
+            "You did not make all of your picks.  This is okay. Press Continue to save your current picks. \
+You can come back before the pool closes to complete your picks. \
+If you do not complete your picks before the pool closes, \
+we will fill in the missing picks for you using our default algorithm. \
+Press Cancel to go back and work on your picks before submitting.",
+          );
+          if (!proceed) {
+            return;
+          }
+        }
+
+        savePicksButton.disabled = true;
+        savePicksButton.textContent = "Saving...";
+
+        try {
+          console.log("Saving picks with payload:", payload);
+          const response = await fetch(savePicksUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              `savePicks failed with status ${response.status}`,
+            );
+          }
+
+          const data = await response.json();
+          console.log("Success:", data);
+          setLastSavedAt(data?.savedAt || new Date().toISOString());
+          setDiagnostics("");
+          alert("Picks saved successfully!");
+        } catch (error) {
+          console.error("Error:", error);
+          setDiagnostics(`Save error: ${error?.message || "Unknown error"}`);
+          alert(
+            "We could not save your picks. Please contact the pool administrator.",
+          );
+        } finally {
+          savePicksButton.disabled = false;
+          savePicksButton.textContent = defaultSaveLabel;
+        }
+      });
+    }
+    function sleep(time) {
+      return new Promise((resolve) => setTimeout(resolve, time));
+    }
+
+    async function loadPickSheetPage() {
+      setLoadingSpinnerVisible(true);
+      await sleep(200); // Add a slight delay to ensure the spinner is visible before loading data
+      try {
+        setDiagnostics("");
+        const picksBody = document.getElementById("picksBody");
+        if (picksBody) {
+          picksBody.innerHTML = renderPickSheetSkeleton();
+        }
+
+        const [pickSheetData, savedPicksData] = await Promise.all([
+          fetchWeeklySchedule(),
+          fetchCurrentUserPicks(),
+        ]);
+
+        const list = normalizeScheduleRows(pickSheetData);
+        if (picksBody) {
+          console.log("Rendering pick sheet with data:", list);
+          picksBody.innerHTML = await renderPickSheet(list);
+          document.querySelector('#picksheet table').style.visibility = 'visible';
+          document.getElementById('pickButtons').style.visibility = 'visible';
+        }
+
+        applyUserPicksToForm(savedPicksData);
+        registerSavePicksHandler();
+
+        const allAwayButton = document.getElementById("allAwayTeams");
+        if (allAwayButton) {
+          allAwayButton.addEventListener("click", checkAllAwayTeams);
+        }
+
+        const allHomeButton = document.getElementById("allHomeTeams");
+        if (allHomeButton) {
+          allHomeButton.addEventListener("click", checkAllHomeTeams);
+        }
+
+        const allFavoritesButton = document.getElementById("allFavorites");
+        if (allFavoritesButton) {
+          allFavoritesButton.addEventListener("click", checkAllFavorites);
+        }
+
+        const allUnderdogsButton = document.getElementById("allUnderdogs");
+        if (allUnderdogsButton) {
+          allUnderdogsButton.addEventListener("click", checkAllUnderdogs);
+        }
+
+        const allRandomButton = document.getElementById("allRandom");
+        if (allRandomButton) {
+          allRandomButton.addEventListener("click", checkAllRandom);
+        }
+
+        const clearMyPicksButton = document.getElementById("clearMyPicks");
+        if (clearMyPicksButton) {
+          clearMyPicksButton.addEventListener("click", clearMyPicks);
+        }
+
+        wireSelectionHighlighting();
+        setDiagnostics("");
+        console.log("Dispatching picksheet:rendered event");
+        window.dispatchEvent(new Event("picksheet:rendered"));
+      } catch (error) {
+        console.error("Error:", error);
+        setDiagnostics(`Load error: ${error?.message || "Unknown error"}`);
+      } finally {
+        setLoadingSpinnerVisible(false);
+      }
+    }
+    // Check pool status. If picks are locked, disable the form and show a message.
+    async function checkPoolStatus() {
+      try {
+        const urlKey = "getPoolStatus";
+        const serviceUrl = await getServiceUrl(urlKey);
+        const response = await fetch(serviceUrl, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch pool status with status ${response.status}`,
+          );
+        } else {
+          const data = await response.json();
+          console.log("Fetched pool status:", data);
+          const body = JSON.parse(data.body);
+          const poolOpen = body.pool_open;
+          const statusEl = document.getElementById("poolStatus");
+          if (statusEl) {
+            statusEl.textContent = poolOpen ? "FBP Pool Is Open" : "FBP Pool Is Closed";
+            statusEl.style.color = poolOpen ? "green" : "red";
+          }
+          if (!poolOpen) {
+            setInfoBanner("Picks are currently locked for this week. You can view the pick sheet, but you cannot make changes. Please contact fbpadmin@my-fbp.com if you have any questions.");
+            const formElements = document
+              .getElementById("picksheet")
+              ?.querySelectorAll("input, button");
+            formElements?.forEach((el) => (el.disabled = true));
+          }
+          else {
+            setInfoBanner("Picks are currently open for this week. Make your picks and save them before the deadline!");
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching pool status:", error);
+        setInfoBanner("We could not determine the pool status. Please contact the pool administrator at fbpadmin@my-fbp.com");
+      }
+    }
+    document.addEventListener("DOMContentLoaded", async () => {
+      await loadPickSheetPage();
+      checkPoolStatus();
+    });
+  </script>
+</head>
+
+<body class="fbp-home">
+  <header>
+    <h1 class="page-title">Pick Sheet</h1>
+  </header>
+  <script>
+    function setInfoBanner(message = "") {
+      const bannerEl = document.getElementById("infoBanner");
+      if (!bannerEl) {
+        return;
+      }
+
+      if (!message) {
+        bannerEl.textContent = "";
+        bannerEl.style.display = "none";
+        return;
+      }
+
+      bannerEl.textContent = message;
+      bannerEl.style.display = "block";
+    }
+    function setDiagnostics(message = "") {
+      const bannerEl = document.getElementById("diagnosticsBanner");
+      if (!bannerEl) {
+        return;
+      }
+
+      if (!message) {
+        bannerEl.textContent = "";
+        bannerEl.style.display = "none";
+        return;
+      }
+
+      const traceId = new Date().toISOString().replace(/[\-:.TZ]/g, "").slice(0, 14);
+      bannerEl.textContent = `${message} (trace: ${traceId})`;
+      bannerEl.style.display = "block";
+    }
+  </script>
+
+
+  <div class="container" style="display:flex; gap:2rem; align-items:flex-start; margin:0; max-width:100%;">
+    <script type="module">
+      import { initNav } from "/js-lib/nav.js";
+      await initNav();
+    </script>
+    <aside class="nav-choices">
+      <!-- populated by nav.js -->
+    </aside>
+    <main class="results-main">
+      <div class="callout">Current Week: <span id="current-week"></span></div>
+      <div id="infoBanner" aria-live="polite"></div>
+      <div id="loadingSpinner" aria-hidden="true" aria-label="Loading pick sheet..."></div>
+      <form id="picksheet" autocomplete="off">
+        <h2 id="poolStatus" style="text-align:center; margin-bottom:1rem;"></h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Pick</th>
+              <th>Away</th>
+              <th>Home</th>
+              <th>Pick</th>
+            </tr>
+          </thead>
+          <tbody id="picksBody">
+            <!-- Table rows will be rendered here by JS -->
+          </tbody>
+          <tr>
+            <td></td>
+            <td>TieBreaker</td>
+            <td>
+              <input type="text"
+                title="Enter the total combined score of the Monday Night Football game as a tiebreaker.  Valid range is 2 to 150"
+                aria-label="Monday Night Football Tie Breaker: Enter the total combined score of the Monday Night Football game. Valid range is 2 to 150"
+                size="2" id="mondayNightTieBreaker" name="mondayNightTieBreaker" />
+            </td>
+            <td></td>
+          </tr>
+        </table>
+        <div id="pickButtons" style="visibility:hidden;">
+          <button type="button" id="allAwayTeams">All Away Teams</button>
+          <button type="button" id="allHomeTeams">All Home Teams</button>
+          <button type="button" id="allFavorites">All Favorites</button>
+          <button type="button" id="allUnderdogs">All Underdogs</button>
+          <button type="button" id="allRandom">Random</button>
+          <button type="button" id="clearMyPicks">Clear My Picks</button>
+          <button type="button" id="savePicks">Save Your Picks</button>
+        </div>
+      </form>
+    </main>
+  </div>
+  <footer>
+    <p>
+      Questions? Contact us at <a href="mailto:fbpadmin@my-fbp.com">fbpadmin@my-fbp.com</a>
+    </p>
+    <p>&copy; 2026 FBP. All rights reserved.</p>
+  </footer>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // delegate change on checkboxes
+      document.body.addEventListener('change', (e) => {
+        const cb = e.target;
+        if (!cb.classList.contains('pick-checkbox')) return;
+        const id = cb.id;
+        const otherId = id.endsWith('A') ? id.slice(0, -1) + 'H' : id.slice(0, -1) + 'A';
+        if (cb.checked) document.getElementById(otherId).checked = false;
+      });
+
+      // clicks on images toggle corresponding checkbox
+      document.body.addEventListener('click', (e) => {
+        const img = e.target.closest('.pick-img');
+        if (!img) return;
+        const pickId = img.dataset.pick;
+        const cb = document.getElementById(pickId);
+        if (!cb) return;
+        cb.checked = !cb.checked;
+        // uncheck opposing
+        const otherId = pickId.endsWith('A') ? pickId.slice(0, -1) + 'H' : pickId.slice(0, -1) + 'A';
+        if (cb.checked) document.getElementById(otherId).checked = false;
+        // optionally trigger change event
+        cb.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+
+  </script>
+  <div id="chat-widget">
+    <button id="chat-toggle" onclick="document.getElementById('chat-widget').classList.toggle('open')"
+      aria-label="Toggle chat">
+      💬 FBP Assistant
+    </button>
+    <div id="chat-body">
+      <div id="chat-messages"></div>
+      <div id="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Ask me about FBP..." autocomplete="off">
+        <button id="chat-send" onclick="window.sendChatBotMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    import { sendChatBotMessage } from "/js-lib/chatbot.js";
+    window.sendChatBotMessage = sendChatBotMessage;
+  </script>
+
+</body>
+<style>
+  /* Override page-title positioning to not cover menu button */
+  .page-title {
+    position: static;
+    transform: none;
+    left: auto;
+    width: 100vw;
+    max-width: 100%;
+    text-align: center;
+    margin-top: 2rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .results-layout {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2.5rem;
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .results-main {
+    flex: 1;
+    min-width: 320px;
+  }
+
+  .nav-choices {
+    min-width: 260px;
+    max-width: 320px;
+    margin-top: 0.5rem;
+  }
+
+  .nav-choices ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+
+  .nav-choices a {
+    text-decoration: none;
+    color: #1976d2;
+    font-weight: 500;
+    font-size: 1.08rem;
+    transition: color 0.2s;
+  }
+
+  .nav-choices a:hover {
+    color: #0d47a1;
+    text-decoration: underline;
+  }
+
+  .nav-right {
+    order: 2;
+    margin-left: 2.5rem;
+    margin-right: 0;
+  }
+
+  .results-main {
+    order: 1;
+  }
+
+  @media (max-width: 900px) {
+    .results-layout {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .nav-choices {
+      max-width: 100%;
+      margin-bottom: 1.5rem;
+      margin-left: 0;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .results-layout {
+      display: block;
+    }
+
+    .nav-choices {
+      display: none !important;
+    }
+
+    .container {
+      flex-direction: column !important;
+    }
+  }
+</style>
+
+</html>

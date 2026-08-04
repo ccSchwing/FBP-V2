@@ -1,0 +1,7 @@
+If I need to recreate my API, will the underlying record get updated to reflect the new GW id?
+
+Amazon Q
+No — if you recreate your API Gateway, you'll get a new API ID and a new domain name (e.g., d-xxxxxxxxxx.execute-api.us-east-1.amazonaws.com). The Route 53 alias record will not update automatically. You'd need to manually redo several steps:
+API Gateway — Reassociate the custom domain my-fbp.com with the new API and re-create the API mapping to the new API ID/stage
+Route 53 — Run the UPSERT command again with the new API Gateway domain name and its corresponding Hosted Zone ID
+Twilio — No change needed as long as the path /twilio-webhook stays the same

@@ -1,0 +1,22 @@
+{
+  "version": "2.0",
+  "routeKey": "POST /deposit",
+  "rawPath": "/deposit",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": "{\"depositAmount\":100, \"email\":\"chuckschwing@proton.me\"}",
+  "requestContext": {
+    "http": {
+      "method": "POST",
+      "path": "/deposit",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    },
+    "routeKey": "POST /deposit",
+    "stage": "$default"
+  },
+  "isBase64Encoded": false
+}

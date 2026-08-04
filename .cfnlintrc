@@ -1,0 +1,27 @@
+ignore_templates:
+  - .venv/**/*
+  - .aws-sam/**/*
+  - node_modules/**/*
+  - "**/{{cookiecutter.*}}/**"
+
+# Temporary suppression for IAM advisory noise while keeping other lint checks active.
+# I3510 is an IAM informational rule in cfn-lint.
+ignore_checks:
+  - I3510
+
+# Optional alternate suppressions (commented out):
+# Use one of these only if your Problems list shows this exact rule ID/source.
+# - W11        # Common cfn-nag inline IAM policy advisory ID
+# - CKV_AWS_40 # Common Checkov inline IAM policy advisory ID
+
+# Optional stricter mode (commented out):
+# Enable this if you want cfn-lint to only scan selected templates.
+# templates:
+#   - template.yaml
+#   - "**/template.yaml"
+
+# Optional focused mode (commented out):
+# Enable this if you want to lint only the root template plus templates in one subfolder.
+# templates:
+#   - template.yaml
+#   - "infrastructure/**/*.yaml"

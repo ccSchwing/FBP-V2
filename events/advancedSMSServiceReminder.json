@@ -1,0 +1,22 @@
+{
+  "version": "2.0",
+  "routeKey": "POST /advanced-sms",
+  "rawPath": "/advanced-sms",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": "{\"sms_type\":\"reminder\",\"recipient\":\"+17325007427\", \"data\": {\"user_name\": \"Chuck\"}}",
+  "requestContext": {
+    "http": {
+      "method": "POST",
+      "path": "/advanced-sms",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    },
+    "routeKey": "POST /advanced-sms",
+    "stage": "$default"
+  },
+  "isBase64Encoded": false
+}

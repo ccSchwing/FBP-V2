@@ -1,0 +1,9 @@
+{
+  "httpMethod": "POST",
+  "path": "/getFBPPicks",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": "{\"email\": \"chuckschwing@proton.me\"}",
+  "isBase64Encoded": false
+}

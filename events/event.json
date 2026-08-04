@@ -1,0 +1,11 @@
+{
+  "httpMethod": "GET",
+  "path": "/debug",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "queryStringParameters": {
+    "email": "chuckschwing@proton.me"
+  },
+  "isBase64Encoded": false
+}

@@ -1,0 +1,21 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /getschedule",
+  "rawPath": "/getschedule",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "requestContext": {
+    "http": {
+      "method": "GET",
+      "path": "/getschedule",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    },
+    "routeKey": "GET /getschedule",
+    "stage": "$default"
+  },
+  "isBase64Encoded": false
+}

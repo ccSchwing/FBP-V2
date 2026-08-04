@@ -1,0 +1,15 @@
+GameId,Week,Date,Away,Home,AwayScore,HomeScore,Spread,Winner,Underdog
+09-001,9,Thu October 30,Ravens,Dolphins,21,24,6.5,H or A,H
+09-002,9,Sun November 2,Falcons,Patriots,42,28,7.5,H or A,A
+09-003,9,Sun November 2,Panthers,Packers,31,41,3.5,H or A,H
+09-004,9,Sun November 2,Bears,Bengals,10,44,4.5,H or A,H
+09-005,9,Sun November 2,Broncos,Texans,16,17,8.5,H or A,A
+09-006,9,Sun November 2,Colts,Steelers,10,17,10.5,H or A,A
+09-007,9,Sun November 2,Chargers,Titans,35,38,6.5,H or A,A
+09-008,9,Sun November 2,Vikings,Lions,21,24,3.5,H or A,A
+09-009,9,Sun November 2,49ers,Giants,28,31,0.5,H or A,H
+09-010,9,Sun November 2,Jaguars,Raiders,28,17,1.5,H or A,H
+09-011,9,Sun November 2,Saints,Rams,41,24,8.5,H or A,A
+09-012,9,Sun November 2,Chiefs,Bills,13,24,7.5,H or A,A
+09-013,9,Sun November 2,Seahawks,Commanders,7,10,8.5,H or A,H
+09-014,9,Mon November 3,Cardinals,Cowboys,32,31,2.5,H or A,A

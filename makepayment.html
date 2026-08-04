@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <style>
+        #main-nav {
+            display: none;
+            position: absolute;
+            top: 90px;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border-bottom: 1px solid #ccc;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        #main-nav[aria-expanded="true"],
+        #main-nav[data-open="true"] {
+            display: block;
+        }
+
+        .menu-btn {
+            display: inline-block;
+            background: #eee;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-size: 1.2em;
+            margin-bottom: 0;
+            z-index: 1100;
+            position: relative;
+            cursor: pointer;
+        }
+
+        @media (min-width: 1024px) {
+            #main-nav {
+                display: block !important;
+                position: static;
+                background: none;
+                border: none;
+                box-shadow: none;
+            }
+
+            #main-nav ul {
+                display: flex;
+                gap: 1.5em;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .menu-btn {
+                display: none;
+            }
+        }
+
+        #main-nav ul {
+            list-style: none;
+            padding: 0.5em 1em;
+            margin: 0;
+        }
+
+        #main-nav li {
+            margin: 0.5em 0;
+        }
+
+        @media (min-width: 1024px) {
+            #main-nav li {
+                margin: 0 0.5em;
+            }
+        }
+    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="/js-lib/oidc-client-ts.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+    <title>Payment Page</title>
+</head>
+
+<body>
+    <h1 style="text-align:center">FBP Payment Page</h1>
+    <div>
+        <button id="menuBtn" class="menu-btn" aria-controls="main-nav" aria-expanded="false">☰ Menu</button>
+        <nav id="main-nav" aria-label="Main navigation" data-open="false">
+            <ul>
+                <li><a href="https://venmo.com/u/Chuck-Schwing"><img src="/images/venmo.png" alt="Venmo"
+                            style="height: 40px; vertical-align: middle;"></a></li><br>
+                <li><a href="https://paypal.me/chuckschwing"><img src="/images/paypal.png" alt="PayPal"
+                            style="height: 40px; vertical-align: middle;"></a></li><br>
+            </ul>
+        </nav>
+
+    </div>
+    <script type="module">
+        import { wireHamburger } from "/js-lib/uiUtils.js";
+        wireHamburger({ buttonId: "menuBtn", navId: "main-nav" });
+    </script>
+    <footer>
+        <p>
+            See our <a href="https://my-fbp.com/faq.html"><b>FBP FAQ</b></a> for more information.<br>
+            Questions? Contact us at <a href="mailto:fbpadmin@my-fbp.com">fbpadmin@my-fbp.com</a>
+        </p>
+        <p>&copy; 2026 FBP. All rights reserved.</p>
+    </footer>
+</body>
+
+</html>

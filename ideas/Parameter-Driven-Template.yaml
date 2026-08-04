@@ -1,0 +1,16 @@
+Parameters:
+  Year:
+    Type: String
+    Default: "2026"
+
+Resources:
+  SomeFunction:
+    Properties:
+      Environment:
+        Variables:
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPTeamRecordsTableName: !Sub "${Year}-Record"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-Schedule"

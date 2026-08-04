@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <script src="/js-lib/oidc-client-ts.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+  <title>Current Standings</title>
+  <style>
+    #resultsTable tbody tr:nth-child(even) {
+      background-color: #ffffff;
+    }
+
+    #resultsTable tbody tr:hover {
+      background-color: #f5f5f5;
+    }
+  </style>
+
+  <script type="module">
+    import { auth } from "/js/auth.js";
+    import { initNav } from "/js-lib/nav.js";
+    await auth.ensureAuthenticated();
+    const user = await auth.getUser();
+    console.log("Authenticated user:", user);
+    window.user = user;
+
+    // Now call getUserStatus after user is loaded
+    const { getUserStatus } = await import("/js-lib/userUtils.js");
+    await getUserStatus();
+    await initNav();
+  </script>
+    <script type="module">
+        import { getCurrentWeek } from "/js-lib/fbpUtils.js";
+        // Removed local getCurrentWeek function since it's now imported from fbpUtils.js
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                const currentWeek = await getCurrentWeek();
+                document.getElementById("current-week").textContent = currentWeek;
+                console.log("Current week data:", currentWeek);
+            } catch (error) {
+                console.error("Error fetching current week data:", error);
+                alert("Failed to load current week data. Please try again later.");
+            }
+        });
+    </script>
+  <script type="module">
+    import { export2txt } from "/js-lib/picksheetUtils.js";
+    async function setGridStatus(message, type = "success") {
+      const statusDiv = document.getElementById("gridStatus");
+      statusDiv.textContent = message;
+      statusDiv.className = type; // Use class to set color based on type
+    }
+    window.setGridStatus = setGridStatus; // Make it globally accessible for other scripts
+  </script>
+  <script>
+    window.addEventListener("DOMContentLoaded", async () => {
+      const response = await getStandings();
+    });
+
+    async function getStandings() {
+      try {
+        setGridStatus("Fetching current standings...");
+        const { getServiceUrl } = await import("/js-lib/urlConfig.js");
+        const URL_KEY = "getStandings";
+        const lambdaURL = await getServiceUrl(URL_KEY);
+        const response = await fetch(lambdaURL, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+        console.log("Status:", response.status);
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Response:", data);
+          populateResultsTable(data);
+          setGridStatus("Current standings fetched successfully.", "success");
+          window.results = data;
+        } else {
+          console.error(
+            "Error: Lambda function returned status",
+            response.status,
+          );
+          setGridStatus(
+            "Error fetching current standings. Check console for details.",
+            "error",
+          );
+        }
+      } catch (error) {
+        console.error("Error fetching weekly results:", error);
+        setGridStatus(
+          "Error fetching weekly results. Check console for details.",
+          "error",
+        );
+      }
+    }
+  </script>
+</head>
+
+<body class="fbp-home">
+  <header>
+    <h1 style="text-align: center" class="page-title">Current Standings</h1>
+  </header>
+  <div class="container" style="display:flex; gap:2rem; align-items:flex-start; margin:0; max-width:100%;">
+
+    <aside class="nav-choices">
+      <!-- populated by nav.js -->
+    </aside>
+
+    <main>
+      <div class="callout">Current Week: <span id="current-week"></span></div>
+    </main>
+
+    <div class="results-layout">
+      <main class="results-main">
+        <table id="resultsTable">
+          <thead>
+            <tr>
+              <th>DisplayName</th>
+              <th>Wins</th>
+              <th>Losses</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <script>
+            function populateResultsTable(results) {
+              const tbody = document.querySelector("#resultsTable tbody");
+              tbody.innerHTML = ""; // Clear existing rows
+
+              var count = 1;
+              var overallWinstotal = 0;
+              var currentWinstotal = 0;
+              results.forEach((result) => {
+                var row = document.createElement("tr");
+                const displayNameCell = document.createElement("td");
+                displayNameCell.textContent = result.displayName;
+                const winsCell = document.createElement("td");
+                winsCell.textContent = result.totalCorrectPicks;
+                currentWinstotal = result.totalCorrectPicks;
+                const lossesCell = document.createElement("td");
+                lossesCell.textContent = result.totalIncorrectPicks;
+
+                if (count == 1) {
+                  overallWinstotal = result.totalCorrectPicks;
+                  row.style.borderLeft = '6px solid #ffd700'; // Gold for 1st place
+                  row.style.backgroundColor = 'lightblue';
+                  row.appendChild(displayNameCell);
+                  row.appendChild(winsCell);
+                  row.appendChild(lossesCell);
+                  tbody.appendChild(row);
+
+                }
+                if (count == 2) {
+                  if (overallWinstotal == currentWinstotal) {
+                    row.style.borderLeft = '6px solid #ffd700'; // Gold for tie in 1st place
+                    row.style.backgroundColor = 'lightblue';
+                  } else {
+                    row.style.borderLeft = '6px solid #c0c0c0'; // Silver for 2nd place
+                    row.style.backgroundColor = 'lightgray';
+                  }
+                  row.appendChild(displayNameCell);
+                  row.appendChild(winsCell);
+                  row.appendChild(lossesCell);
+                  tbody.appendChild(row);
+
+                }
+                if (count == 3) {
+                  row.style.borderLeft = '6px solid #CD7F32';
+                  row.style.backgroundColor = 'lightyellow';
+                  row.appendChild(displayNameCell);
+                  row.appendChild(winsCell);
+                  row.appendChild(lossesCell);
+                  tbody.appendChild(row);
+                }
+                if (count > 3) {
+                  row.style.borderLeft = '6px solid transparent';
+                  row.appendChild(displayNameCell);
+                  row.appendChild(winsCell);
+                  row.appendChild(lossesCell);
+                  tbody.appendChild(row);
+
+                }
+                count++;
+                // row.appendChild(displayNameCell);
+                // row.appendChild(winsCell);
+                // row.appendChild(lossesCell);
+                // tbody.appendChild(row);
+              });
+            }
+          </script>
+        </table>
+        <div id="gridStatus" style="margin-top: 20px"></div>
+        <div id="getUpdatedResults"></div>
+      </main>
+    </div>
+    <div id="chat-widget">
+      <button id="chat-toggle" onclick="document.getElementById('chat-widget').classList.toggle('open')"
+        aria-label="Toggle chat">
+        💬 FBP Assistant
+      </button>
+      <div id="chat-body">
+        <div id="chat-messages"></div>
+        <div id="chat-input-row">
+          <input type="text" id="chat-input" placeholder="Ask me about FBP..." autocomplete="off">
+          <button id="chat-send" onclick="window.sendChatBotMessage()">Send</button>
+        </div>
+      </div>
+    </div>
+    <script type="module">
+      import { sendChatBotMessage } from "/js-lib/chatbot.js";
+      window.sendChatBotMessage = sendChatBotMessage;
+    </script>
+
+    <footer>
+      <p>
+        Questions? Contact us at <a href="mailto:fbpadmin@my-fbp.com">fbpadmin@my-fbp.com</a>
+      </p>
+      <p>&copy; 2026 FBP. All rights reserved.</p>
+    </footer>
+  </div>
+</body>
+
+</html>

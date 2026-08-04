@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="/js-lib/oidc-client-ts.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+    <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.3/js/jquery.tablesorter.min.js">
+    </script>
+
+    <script type="module">
+        import { auth } from "/js/auth.js";
+        await auth.ensureAuthenticated();
+        const user = await auth.getUser();
+        if (user && user.profile && user.profile.email) {
+            const userEmail = user.profile.email;
+            window.userEmail = userEmail; // make it global for convenience
+        }
+        console.log("Authenticated user:", user);
+        window.user = user;
+
+        // Now call getUserStatus after user is loaded
+        const { getUserStatus } = await import("/js-lib/userUtils.js");
+        await getUserStatus();
+    </script>
+    <script type="module">
+        import { getCurrentWeek } from "/js-lib/fbpUtils.js";
+        // Removed local getCurrentWeek function since it's now imported from fbpUtils.js
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                const currentWeek = await getCurrentWeek();
+                document.getElementById("current-week").textContent = currentWeek;
+                console.log("Current week data:", currentWeek);
+            } catch (error) {
+                console.error("Error fetching current week data:", error);
+                alert("Failed to load current week data. Please try again later.");
+            }
+        });
+    </script>
+    <script type="module">
+        import { getServiceUrl } from "/js-lib/urlConfig.js";
+        async function fetchTeamRecords() {
+            try {
+                const urlKey = "getTeamRecords";
+                const serviceUrl = await getServiceUrl(urlKey);
+                const response = await fetch(serviceUrl, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                });
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch team records data with status ${response.status}`);
+                }
+                const data = await response.json();
+                if (!data) {
+                    throw new Error("Received empty data for team records.");
+                }
+                console.log("Fetched team records data:", data);
+                const parsed = JSON.parse(data.body);
+                const list = parsed.items ?? parsed;
+                console.log("Parsed team records data:", parsed);
+                console.log("Parsed list of records data:", list);
+                return list.sort((a, b) => a.TeamName.localeCompare(b.TeamName)); // Sort by team name
+            } catch (error) {
+                const logsOutput = document.getElementById('logsOutput');
+                logsOutput.textContent = `Error fetching team records`;
+            }
+        }
+
+        function displayLogsInTable(data) {
+            const logData = data;
+            if (!logData) {
+                alert("No log data available to display.");
+                return;
+            }
+
+            // Clear existing content
+            const logsOutput = document.getElementById('logsOutput');
+            logsOutput.innerHTML = '';
+
+            // Create table
+            const table = document.createElement("table");
+            table.id = "teamRecordsTable";
+            table.className = "tablesorter";
+            table.style.marginLeft = "20px";
+            const thead = document.createElement('thead');
+            const tbody = document.createElement('tbody');
+
+            // Define table headers based on log properties
+            const headers = ['Team', 'Games Played', 'Wins As Favorite', 'Losses As Favorite',
+                'Wins As Underdog', 'Losses As Underdog'];
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // Populate table rows with log data
+            const dataHeaders = ['TeamName', 'GamesPlayed', 'FavoriteWins', 'FavoriteLosses', 'UnderdogWins', 'UnderdogLosses'];
+            logData.forEach(log => {
+                const row = document.createElement('tr');
+                dataHeaders.forEach(header => {
+                    const td = document.createElement('td');
+                    td.textContent = log[header] || '';
+                    row.appendChild(td);
+                });
+                tbody.appendChild(row);
+            });
+            table.appendChild(tbody);
+            logsOutput.appendChild(table);
+
+            // Enable click-to-sort behavior on each column header.
+            if ($.fn.tablesorter) {
+                $("#teamRecordsTable").tablesorter();
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                const teamRecordsData = await fetchTeamRecords();
+                await displayLogsInTable(teamRecordsData);
+            } catch (error) {
+                console.error("Error fetching team records:", error);
+                alert("Failed to load team records data. Please try again later.");
+            }
+        });
+    </script>
+    <style>
+        #logsOutput table th,
+        #logsOutput table td {
+            border: 1px solid black;
+        }
+
+        #logsOutput table {
+            width: auto;
+            border: 2px solid black;
+            padding: 5px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            background-origin: padding-box;
+            border-collapse: collapse;
+            border-color: black;
+        }
+
+        #logsOutput table th {
+            background-color: #4caf50;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #teamRecordsTable {
+            border-collapse: collapse;
+            border: 2px solid black;
+            margin-top: 5px;
+        }
+
+        #teamRecordsTable th,
+        #teamRecordsTable td {
+            border: 1px solid black;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        #teamRecordsTable th {
+            background-color: #4caf50;
+            color: white;
+            font-weight: bold;
+        }
+
+        #teamRecordsTable tbody tr:nth-child(odd) {
+            background-color: #f9f9f9;
+        }
+
+        #teamRecordsTable tbody tr:nth-child(even) {
+            background-color: #ffffff;
+        }
+
+        #teamRecordsTable tbody tr:hover {
+            background-color: #f5f5f5;
+        }
+    </style>
+    <title>Get Team Records</title>
+</head>
+
+<body class="fbp-home">
+    <header>
+        <h1 class="page-title">NFL Team Records</h1>
+    </header>
+    <div class="container" style="display:flex; gap:2rem; align-items:flex-start; margin:0; max-width:100%;">
+        <script type="module">
+            import { initNav } from "/js-lib/nav.js";
+            await initNav();
+        </script>
+        <aside class="nav-choices">
+            <!-- populated by nav.js -->
+        </aside>
+        <main class="results-main">
+            <div class="callout">Current Week: <span id="current-week"></span></div>
+            <div class="callout">Click any column header to sort the table.</div>
+            <div id="team-records-table-container"></div>
+            <div id="logsResult">
+                <pre id="logsOutput" style="margin-left: 20px;">No logs loaded yet.</pre>
+            </div>
+        </main>
+    </div>
+    <div id="chat-widget">
+        <button id="chat-toggle" onclick="document.getElementById('chat-widget').classList.toggle('open')"
+            aria-label="Toggle chat">
+            💬 FBP Assistant
+        </button>
+        <div id="chat-body">
+            <div id="chat-messages"></div>
+            <div id="chat-input-row">
+                <input type="text" id="chat-input" placeholder="Ask me about FBP..." autocomplete="off">
+                <button id="chat-send" onclick="window.sendChatBotMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+    <script type="module">
+        import { sendChatBotMessage } from "/js-lib/chatbot.js";
+        window.sendChatBotMessage = sendChatBotMessage;
+    </script>
+
+    <footer>
+        <p>
+            Questions? Contact us at <a href="mailto:fbpadmin@my-fbp.com">fbpadmin@my-fbp.com</a>
+        </p>
+        <p>&copy; 2026 FBP. All rights reserved.</p>
+    </footer>
+</body>
+
+</html>

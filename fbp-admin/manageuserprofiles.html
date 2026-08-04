@@ -1,0 +1,588 @@
+<!doctype html>
+<html>
+
+<head>
+  <!-- Removed local menu/nav CSS to avoid conflicts; using global styles.css for menu and nav. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+  <script src="/js-lib/oidc-client-ts.min.js"></script>
+  <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+  <title>Manage User Profiles</title>
+  <style>
+    /* Minimal responsive hamburger menu styles */
+    #main-nav {
+      display: none;
+      position: absolute;
+      top: 48px;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border-bottom: 1px solid #ccc;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    #main-nav[aria-expanded="true"],
+    #main-nav[data-open="true"] {
+      display: block;
+    }
+
+    .menu-btn {
+      display: inline-block;
+      background: #eee;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 8px 16px;
+      font-size: 1.2em;
+      margin-bottom: 0;
+      z-index: 1100;
+      position: relative;
+      cursor: pointer;
+    }
+
+    @media (min-width: 700px) {
+      #main-nav {
+        display: block !important;
+        position: static;
+        background: none;
+        border: none;
+        box-shadow: none;
+      }
+
+      #main-nav ul {
+        display: flex;
+        gap: 1.5em;
+        justify-content: flex-start;
+        align-items: center;
+      }
+
+      .menu-btn {
+        display: none;
+      }
+    }
+
+    #main-nav ul {
+      list-style: none;
+      padding: 0.5em 1em;
+      margin: 0;
+    }
+
+    #main-nav li {
+      margin: 0.5em 0;
+    }
+
+    @media (min-width: 700px) {
+      #main-nav li {
+        margin: 0 0.5em;
+      }
+    }
+  </style>
+  <script type="module">
+    import { auth } from "/js/auth.js";
+    await auth.ensureAuthenticated();
+  </script>
+  <title>Manage User Profiles</title>
+  <script type="module">
+    import { getServiceUrl } from "/js-lib/urlConfig.js";
+
+    let email = null;
+
+    let cachedProfileData = null;
+    async function getFBPUserEmailAndDisplayName() {
+      try {
+        const URL_KEY = "getFBPUserEmailAndDisplayName";
+        const lambdaURL = await getServiceUrl(URL_KEY);
+        const response = await fetch(lambdaURL, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `Failed to retrieve user email and display name (${response.status}): ${errorText}`,
+          );
+        }
+        const data = await response.json();
+        // console.log("Email and display name response:", data);
+        let userListArray = [];
+        if (data && data.body) {
+          try {
+            const parsed = JSON.parse(data.body);
+            const list = parsed.items ?? parsed;
+            userListArray = Array.isArray(list) ? list : [list];
+            // console.log("Parsed user email/displayName data:", userListArray);
+          } catch (e) {
+            console.error("Failed to parse user list:", e);
+          }
+        }
+        window.userEmailAndDisplayNameData = userListArray;
+        console.log("Dispatching userEmailAndDisplayNameLoaded with:", window.userEmailAndDisplayNameData);
+        window.dispatchEvent(new CustomEvent("userEmailAndDisplayNameLoaded", {
+          detail: window.userEmailAndDisplayNameData
+        }));
+        return userListArray;
+      } catch (error) {
+        alert(
+          "Failed to retrieve user email and display name: " +
+          (error.message || error),
+        );
+        return null;
+      }
+    }
+
+    window.getUserProfile = async function getUserProfile(emailParam) {
+      try {
+        let response = null;
+        if (!emailParam) {
+          alert("No email provided for user profile retrieval.");
+          return null;
+        }
+        const URL_KEY = "getFBPUserPython";
+        const lambdaURL = await getServiceUrl(URL_KEY);
+        response = await fetch(lambdaURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: emailParam,
+          }),
+        });
+        const data = await response.text();
+        // console.log("Response:", data);
+        window.userProfileData = JSON.parse(data);
+        // I know I shouldn't do this, but:
+        loadFormData(window.userProfileData);
+        window.dispatchEvent(
+          new CustomEvent("userProfileDataLoaded", {
+            detail: window.userProfileData,
+          }),
+        );
+        console.log("Dispatched userProfileDataLoaded with:", window.userProfileData,
+        );
+        return window.userProfileData;
+      } catch (error) {
+        alert("Failed to load user profile: " + (error.message || error));
+        return null;
+      }
+    }
+    async function loadFormData(userProfileData) {
+      if (!userProfileData) {
+        console.warn("No user profile data available to pre-fill form.");
+        return;
+      }
+      window.userProfileData = userProfileData || {};
+      console.log( "loadFormdata called with userProfileData:", userProfileData,);
+      let responseBody = JSON.parse(window.userProfileData.body);
+      console.log("LoadFormData response body:", responseBody);
+      document.getElementById("firstName").value =
+        responseBody.firstName || "";
+      document.getElementById("lastName").value =
+        responseBody.lastName || "";
+      document.getElementById("displayName").value =
+        responseBody.displayName || "";
+      document.getElementById("paymentMethod").value =
+        responseBody.paymentMethod || "";
+      document.getElementById("emailPickSheet").checked =
+        responseBody.emailPickSheet || false;
+      document.getElementById("emailReminders").checked =
+        responseBody.emailReminders || false;
+      document.getElementById("emailGridSheet").checked =
+        responseBody.emailGridSheet || false;
+      const defaultTieBreaker = responseBody.defaultTieBreaker;
+      document.getElementById("defaultTieBreaker").value = defaultTieBreaker;
+      const defaultAlgorithm = responseBody.defaultAlgorithm || "";
+      const radioButtons = document.querySelectorAll(
+        'input[name="defaultAlgorithm"]',
+      );
+      radioButtons.forEach((radio) => {
+        radio.checked = radio.value === defaultAlgorithm;
+      });
+    }
+
+    async function validateFormData() {
+      const tieBreakerInput = document.getElementById("defaultTieBreaker");
+      const tieBreakerValue = tieBreakerInput.value.trim();
+      let errorMessages = [];
+      const firstName = document.getElementById("firstName").value.trim();
+      const lastName = document.getElementById("lastName").value.trim();
+      const displayName = document.getElementById("displayName").value.trim();
+      if (firstName === "") {
+        errorMessages.push("First Name cannot be empty.");
+      }
+      if (lastName === "") {
+        errorMessages.push("Last Name cannot be empty.");
+      }
+      if (displayName === "") {
+        errorMessages.push("Display Name cannot be empty.");
+      }
+      if (tieBreakerValue === "") {
+        errorMessages.push("Default Monday Night Tiebreaker cannot be empty.");
+      }
+      const defaultAlgorithm = document.querySelector(
+        'input[name="defaultAlgorithm"]:checked',
+      );
+      if (!defaultAlgorithm) {
+        errorMessages.push("Please select a default algorithm for picks.");
+      }
+      const tieBreakerNumber = Number(tieBreakerValue);
+      if (
+        isNaN(tieBreakerNumber) ||
+        tieBreakerNumber < 0 ||
+        tieBreakerNumber > 99
+      ) {
+        errorMessages.push("Default Monday Night Tiebreaker must be a number between 0 and 99.");
+      }
+      return errorMessages;
+    }
+    window.validateFormData = validateFormData;
+
+
+
+    async function updateUserProfile() {
+      const validationErrors = await window.validateFormData();
+      if (validationErrors.length > 0) {
+        alert("Please fix the following errors:\n\n" + validationErrors.join("\n"));
+        return;
+      }      
+      try {
+        const lambdaURL = await getServiceUrl("updateFBPUserPython");
+        const formData = new FormData(document.forms.addFBPUser);
+        const existingProfile = window.userProfileData || {};
+
+        const requestPayload = {
+          firstName: formData.get("firstName"),
+          lastName: formData.get("lastName"),
+          email: window.emailParam,
+          displayName: formData.get("displayName"),
+          paymentMethod: formData.get("paymentMethod"),
+          isAdmin: formData.has("isAdmin")
+            ? formData.get("isAdmin") === "on"
+            : !!existingProfile.isAdmin,
+          isAccountLocked: formData.has("isAccountLocked")
+            ? formData.get("isAccountLocked") === "on"
+            : !!existingProfile.isAccountLocked,
+          isPaidUser: formData.has("isPaidUser")
+            ? formData.get("isPaidUser") === "on"
+            : !!existingProfile.isPaidUser,
+          emailPickSheet: formData.get("emailPickSheet") === "on",
+          emailReminders: formData.get("emailReminders") === "on",
+          emailGridSheet: formData.get("emailGridSheet") === "on",
+          defaultAlgorithm:
+            document.querySelector('input[name="defaultAlgorithm"]:checked')
+              ?.value || "",
+          defaultTieBreaker: formData.get("defaultTieBreaker") || "",
+        };
+        alert("Updating profile with data: " + JSON.stringify(requestPayload));
+
+        const response = await fetch(lambdaURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestPayload),
+        });
+
+        // console.log( "Response headers:", Object.fromEntries(response.headers.entries()),);
+        const responseData = await response.text();
+        // console.log("Parsed response data:", responseData);
+
+        if (!response.ok) {
+          const errorBody =
+            typeof responseData === "string"
+              ? responseData
+              : JSON.stringify(responseData);
+          throw new Error(`Update failed (${response.status}): ${errorBody}`);
+        }
+
+        const successBody =
+          typeof responseData === "string"
+            ? responseData
+            : JSON.stringify(responseData);
+        alert("User updated successfully!");
+      } catch (error) {
+        console.error("Error:", error);
+        alert(error.message || "Update failed");
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      let fbpUserEmailAndDisplayNameData = await getFBPUserEmailAndDisplayName();
+      console.log("Profile data retrieved:", fbpUserEmailAndDisplayNameData);
+      window.userEmailAndDisplayNameData = fbpUserEmailAndDisplayNameData;
+      window.dispatchEvent(new CustomEvent("userEmailAndDisplayNameLoaded", { detail: fbpUserEmailAndDisplayNameData }));
+
+
+      const updateProfileButton = document.getElementById("updateProfileBtn");
+      if (updateProfileButton) {
+        updateProfileButton.addEventListener("click", updateUserProfile);
+      }
+    });
+
+    // Helper to populate the select with email/displayName data
+    function populateEmailDisplayNameSelect(data) {
+      const select = document.getElementById("email-displayName-select");
+      if (select && data) {
+        select.innerHTML = "";
+        if (Array.isArray(data)) {
+          // get each element in the array and add it as an option to the select
+          // looks like this: [{email: "<email>", displayName: "<displayName>"}, ...]
+
+          for (let i = 0; i < data.length; i++) {
+            // set a blank option at the top of the list
+            if (i === 0) {
+              const blankOption = document.createElement("option");
+              blankOption.hidden = true;
+              blankOption.value = "";
+              blankOption.textContent = "Select a user to view/edit profile";
+              select.appendChild(blankOption);
+            }
+
+            const item = data[i];
+            const option = document.createElement("option");
+            option.value = item.email;
+            option.textContent = `${item.displayName} (${item.email})`;
+            select.appendChild(option);
+          }
+        } else {
+          const option = document.createElement("option");
+          option.value = data.email;
+          option.textContent = `${data.displayName} (${data.email})`;
+          select.appendChild(option);
+        }
+      }
+    }
+
+    // Listen for the custom event to populate the select when data is ready
+    window.addEventListener("userEmailAndDisplayNameLoaded", (event) => {
+      // console.log("userEmailAndDisplayNameLoaded event.detail:", event.detail);
+      populateEmailDisplayNameSelect(event.detail);
+    });
+
+    // If data is already present (e.g., event fired before listener attached), populate immediately
+    if (window.userEmailAndDisplayNameData) {
+      populateEmailDisplayNameSelect(window.userEmailAndDisplayNameData);
+    }
+  </script>
+</head>
+
+<body class="fbp-home">
+  <div class="container">
+    <header>
+      <h1 class="page-title">Manage User Profiles</h1>
+    </header>
+    <script type="module">
+      import { initAdminNav } from "/js-lib/adminNav.js";
+      await initAdminNav();
+    </script>
+  </div>
+  <style>
+    .page-title {
+      width: 100vw;
+      max-width: 100%;
+      text-align: center;
+      margin-top: 2rem;
+      margin-bottom: 1.5rem;
+      left: 50%;
+      position: relative;
+      transform: translateX(-50%);
+    }
+
+    .results-layout {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: flex-start;
+      gap: 2.5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    #email-displayName {
+      margin-left: 10px;
+    }
+
+    .results-main {
+      flex: 2 1 0;
+      min-width: 320px;
+      max-width: 700px;
+      order: 1;
+    }
+
+    .nav-choices {
+      flex: 1 1 0;
+      min-width: 220px;
+      max-width: 320px;
+      margin-top: 0.5rem;
+      order: 2;
+      margin-left: 2.5rem;
+      margin-right: 0;
+    }
+
+    .nav-choices ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .nav-choices a {
+      text-decoration: none;
+      color: #1976d2;
+      font-weight: 500;
+      font-size: 1.08rem;
+      transition: color 0.2s;
+    }
+
+    .nav-choices a:hover {
+      color: #0d47a1;
+      text-decoration: underline;
+    }
+
+    /* .mobile-nav display is now controlled by #main-nav and #main-nav.open for mobile menu toggling. */
+    @media (max-width: 900px) {
+      .results-layout {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .nav-choices {
+        max-width: 100%;
+        margin-bottom: 1.5rem;
+        margin-left: 0;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .results-layout {
+        display: block;
+      }
+
+      .nav-choices {
+        display: none !important;
+      }
+      
+      #email-displayName,
+      .results-main,
+      .results-main form,
+      .results-main button {
+        margin-left: 10px;
+      }
+    }
+  </style>
+  </head>
+
+  <body class="fbp-home">
+    <div id="email-displayName">
+      <form name="email-displayName">
+        <select name="email-displayName-select" id="email-displayName-select">
+          <!-- Options will be populated by the userEmailAndDisplayNameLoaded event listener -->
+        </select>
+      </form>
+    </div>
+    <div class="results-layout">
+      <main class="results-main">
+        <h1>View or Modify User Profile</h1>
+        <form name="addFBPUser" autocomplete="off" data-lpignore="true">
+          <input type="text" name="fake-username" autocomplete="username" tabindex="-1" aria-hidden="true"
+            style="position: absolute; left: -9999px" />
+          <div>
+            <label for="firstName">First Name:</label>
+            <input type="text" name="firstName" id="firstName" autocomplete="off" autocorrect="off" autocapitalize="off"
+              spellcheck="false" data-lpignore="true" />
+          </div>
+          <div>
+            <label for="lastName">Last Name:</label>
+            <input type="text" name="lastName" id="lastName" autocomplete="off" autocorrect="off" autocapitalize="off"
+              spellcheck="false" data-lpignore="true" />
+          </div>
+          <div>
+            <label for="displayName">Display Name:</label>
+            <input type="text" name="displayName" id="displayName" />
+          </div>
+          <div>
+            <label for="paymentMethod">Payment Method:</label>
+            <input type="text" name="paymentMethod" id="paymentMethod" readonly />
+          </div>
+          <div>
+            <label for="EmailPickSheet">Email PickSheet:</label>
+            <input type="checkbox" name="emailPickSheet" id="emailPickSheet" />
+          </div>
+          <div>
+            <label for="EmailReminder">Email Reminder:</label>
+            <input type="checkbox" name="emailReminders" id="emailReminders" />
+          </div>
+          <div>
+            <label for="EmailGridSheet">Email Gridsheet:</label>
+            <input type="checkbox" name="emailGridSheet" id="emailGridSheet" />
+          </div>
+          <div id="defaultAlgorithm">
+            <label for="DefaultAlgorithm">Default for Picks when you don't make picks</label>
+            <br />
+            Away Teams
+            <input type="radio" value="away" name="defaultAlgorithm" />
+            <br />
+            Home Teams
+            <input type="radio" value="home" name="defaultAlgorithm" />
+            <br />
+            All Favorites
+            <input type="radio" value="favorites" name="defaultAlgorithm" />
+            <br />
+            All UnderDogs
+            <input type="radio" value="underdogs" name="defaultAlgorithm" />
+            <br />
+            All Random
+            <input type="radio" value="random" name="defaultAlgorithm" />
+          </div>
+          <div id="DefaultTieBreaker">
+            <label for="defaultTieBreaker">Default TieBreaker (Total Points in Monday Night Game)</label>
+            <input type="text" id="defaultTieBreaker" name="defaultTieBreaker" />
+          </div>
+        </form>
+        <script type="module">
+          const sel = document.getElementById("email-displayName-select");
+          sel.addEventListener("change", (event) => {
+            const selectedEmail = event.target.value;
+            window.emailParam = selectedEmail; // Update global emailParam when selection changes
+            // console.log("Selected email from dropdown:", selectedEmail);
+            if (selectedEmail) {
+              window.getUserProfile(selectedEmail);
+            }
+          });
+        </script>
+        <script type="module">
+          // Prefill form when userProfileData is available
+          if (window.userProfileData) {
+            window.addEventListener("userProfileDataLoaded", (event) => {
+              const userProfileData = event.detail;
+              // console.log( "Pre-filling form with loaded userProfileData:", userProfileData);
+              let responseBody = JSON.parse(userProfileData.body);
+              window.getElementById("firstName").value =
+                responseBody.firstName || "";
+              window.getElementById("lastName").value = responseBody.lastName || "";
+              window.getElementById("displayName").value =
+                responseBody.displayName || "";
+              window.getElementById("emailPickSheet").checked =
+                responseBody.emailPickSheet || false;
+              window.getElementById("emailReminders").checked =
+                responseBody.emailReminders || false;
+              window.getElementById("emailGridSheet").checked =
+                responseBody.emailGridSheet || false;
+              const defaultAlgorithm = responseBody.defaultAlgorithm || "";
+              const radioButtons = document.querySelectorAll(
+                'input[name="defaultAlgorithm"]',
+              );
+              radioButtons.forEach((radio) => {
+                radio.checked = radio.value === defaultAlgorithm;
+              });
+            });
+          }
+        </script>
+        <button id="updateProfileBtn" type="button">Update Profile</button>
+      </main>
+      <aside class="nav-choices nav-right">
+        <!-- populated by adminNav.js -->
+      </aside>
+    </div>
+  </body>
+
+</html>

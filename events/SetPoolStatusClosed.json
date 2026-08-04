@@ -1,0 +1,23 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /setPoolStatusClosed",
+  "rawPath": "/setPoolStatusClosed",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "requestContext": {
+    "routeKey": "GET /setPoolStatusClosed",
+    "stage": "$default",
+    "requestId": "local-request-id",
+    "apiId": "local",
+    "http": {
+      "method": "GET",
+      "path": "/setPoolStatusClosed",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    }
+  },
+  "isBase64Encoded": false
+}

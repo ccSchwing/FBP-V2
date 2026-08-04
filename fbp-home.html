@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FBP Home</title>
+  <script src="/js-lib/oidc-client-ts.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+  <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+  <script type="module">
+    (async () => {
+      const { auth } = await import("/js/auth.js");
+      await auth.ensureAuthenticated();
+      const user = await auth.getUser();
+      console.log("Authenticated user:", user);
+      window.user = user;
+
+      // Now call getUserStatus after user is loaded
+      const { getUserStatus } = await import("/js-lib/userUtils.js");
+      await getUserStatus();
+    })().catch(console.error);
+  </script>
+  <script type="module">
+    import { getCurrentWeek } from "/js-lib/fbpUtils.js";
+    // Removed local getCurrentWeek function since it's now imported from fbpUtils.js
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      try {
+        const currentWeek = await getCurrentWeek();
+        document.getElementById("current-week").textContent = currentWeek;
+        console.log("Current week data:", currentWeek);
+      } catch (error) {
+        console.error("Error fetching current week data:", error);
+        alert("Failed to load current week data. Please try again later.");
+      }
+    });
+  </script>
+  <style>
+    .li {
+      margin: 0.5em 0;
+    }
+
+    @media (min-width: 1024px) {
+      .li {
+        margin: 0 0.5em;
+      }
+    }
+
+    .nav-choices {
+      margin-top: 1em;
+    }
+
+    .center-form {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: auto;
+    }
+
+    #statusBanner {
+      display: block;
+      margin: 8px auto 12px;
+      padding: 8px 10px;
+      border: 1px solid #0c5b63;
+      background: #fff9db;
+      color: #210c78;
+      font-size: 0.92rem;
+      width: fit-content;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body class="fbp-home">
+  <header>
+    <h1>FBP Home</h1>
+    <div id="statusBanner" aria-live="polite" style="text-align: center;"></div>
+  </header>
+  <script type="module">
+    import { initNav } from "/js-lib/nav.js";
+    import { setBannerStatusMessage } from "/js-lib/bannerUtils.js";
+    await initNav();
+    await setBannerStatusMessage();
+  </script>
+  <div class="container" style="display:flex; gap:2rem; align-items:flex-start; margin:0; max-width:100%;">
+    <aside class="nav-choices">
+      <!-- populated by nav.js -->
+    </aside>
+    <main>
+      <div class="callout">Current Week: <span id="current-week"></span></div>
+    </main>
+  </div>
+
+  <div id="chat-widget">
+    <button id="chat-toggle" onclick="document.getElementById('chat-widget').classList.toggle('open')"
+      aria-label="Toggle chat">
+      💬 FBP Assistant
+    </button>
+    <div id="chat-body">
+      <div id="chat-messages"></div>
+      <div id="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Ask me about FBP..." autocomplete="off">
+        <button id="chat-send" onclick="window.sendChatBotMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    import { sendChatBotMessage } from "/js-lib/chatbot.js";
+    window.sendChatBotMessage = sendChatBotMessage;
+  </script>
+  <footer>
+    <p>
+      Questions? Contact us at <a href="mailto:fbpadmin@my-fbp.com">fbpadmin@my-fbp.com</a>
+    </p>
+    <p>&copy; 2026 FBP. All rights reserved.</p>
+  </footer>
+</body>
+
+</html>

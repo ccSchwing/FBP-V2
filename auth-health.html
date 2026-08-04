@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Auth Health Check</title>
+    <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+    <script src="/js-lib/oidc-client-ts.min.js"></script>
+    <style>
+      .health-container {
+        max-width: 760px;
+        margin: 2rem auto;
+        padding: 1rem;
+      }
+      .health-actions {
+        display: flex;
+        gap: 0.75rem;
+        margin: 1rem 0;
+      }
+      #status-list {
+        list-style: none;
+        padding: 0;
+      }
+      #status-list li {
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.5rem;
+        border-left: 4px solid #6b7280;
+        background: #f8fafc;
+      }
+      #status-list li.success {
+        border-left-color: #15803d;
+      }
+      #status-list li.error {
+        border-left-color: #b91c1c;
+      }
+      #status-list li.info {
+        border-left-color: #1d4ed8;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="health-container">
+      <h1>OIDC Auth Health Check</h1>
+      <p>
+        Use this page to validate login, callback processing, token checks, local logout, and hosted Cognito logout.
+      </p>
+      <div class="health-actions">
+        <button id="run-health-check" class="btn btn-primary" type="button">Run Health Check</button>
+        <button id="run-hosted-logout-check" class="btn btn-primary" type="button">Run Hosted Logout Check</button>
+        <button id="reset-health-check" class="btn btn-outline" type="button">Reset State</button>
+      </div>
+      <ul id="status-list"></ul>
+    </main>
+    <script type="module" src="/js/auth-health.js"></script>
+  </body>
+</html>

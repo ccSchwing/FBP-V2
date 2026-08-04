@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Weekly Gridsheet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="/js-lib/oidc-client-ts.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+  <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+  <style>
+    /* Override page-title positioning to not cover menu button */
+    header h1 {
+      position: static;
+      transform: none;
+      left: auto;
+    }
+
+    .tooltip-wrap {
+      position: relative;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .tooltip-wrap .tooltip {
+      visibility: hidden;
+      background: #333;
+      color: #fff;
+      font-size: 0.75rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      position: absolute;
+      bottom: 110%;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      z-index: 10;
+    }
+
+    .tooltip-wrap:hover .tooltip {
+      visibility: visible;
+    }
+
+    .pick-img {
+      width: 30px;
+      height: 30px;
+    }
+
+    @media (max-width: 768px) {
+      .pick-img {
+        width: 25px;
+        height: 25px;
+      }
+    }
+
+    #diagnosticsBanner {
+      display: none;
+      margin: 8px 0 12px;
+      padding: 8px 10px;
+      border: 1px solid #d7a600;
+      background: #fff9db;
+      color: #5c4500;
+      font-size: 0.92rem;
+    }
+
+    #infoBanner {
+      display: visible;
+      margin: 8px 0 12px;
+      padding: 8px 10px;
+      border: 1px solid #0c5b63;
+      background: #fff9db;
+      color: #210c78;
+      font-size: 0.92rem;
+      width: fit-content;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column !important;
+      }
+
+      .container aside {
+        display: none !important;
+      }
+    }
+  </style>
+  <script type="module">
+    import { auth } from "/js/auth.js";
+    await auth.ensureAuthenticated();
+    const user = await auth.getUser();
+    console.log("Authenticated user:", user);
+  </script>
+  <!-- Get pool status.  Only show gridsheet when the Pool is closed -->
+  <script type="module">
+    import { getServiceUrl } from "/js-lib/urlConfig.js";
+
+    async function checkPoolStatus() {
+      try {
+        const apiEndpoint = await getServiceUrl("getPoolStatus");
+        const response = await fetch(apiEndpoint);
+        if (!response.ok) {
+          throw new Error(`getPoolStatus failed with status ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const parsedBody = JSON.parse(payload.body)
+        if (parsedBody.pool_open == true) {
+          alert("The pool is currently open. The gridsheet will be available after the pool closes on Thursday.  Redirecting to home page.");
+          window.location.href = "/fbp-home.html"; // Redirect to home or another appropriate page
+        }
+      } catch (error) {
+        console.error("Error checking pool status:", error);
+        alert("Unable to check pool status right now.  Contact fbpadmin@my-fbp.com if you think this is an error.");
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", checkPoolStatus);
+  </script>
+</head>
+
+<body class="fbp-home">
+  <script type="module">
+    import { getCurrentWeek } from "/js-lib/fbpUtils.js";
+    // Removed local getCurrentWeek function since it's now imported from fbpUtils.js
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      try {
+        const currentWeek = await getCurrentWeek();
+        window.currentWeek = currentWeek; 
+        document.getElementById("current-week").textContent = currentWeek;
+        console.log("Current week data:", currentWeek);
+      } catch (error) {
+        console.error("Error fetching current week data:", error);
+        alert("Failed to load current week data. Please try again later.");
+      }
+    });
+  </script>
+  <header>
+    <h1 id="header">FBP Week <span id="current-week"></span> Gridsheet</h1>
+  </header>
+  <div class="container" style="display:flex; gap:2rem; align-items:flex-start; margin:0; max-width:100%;">
+    <div style="flex:1; min-width:0;">
+      <div id="diagnosticsBanner" aria-live="polite"></div>
+      <!-- <div id="infoBanner" aria-live="polite"></div> -->
+      <table id="gridSheetTable" style="margin-left: auto; margin-right: auto;">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Picks</th>
+            <th>TB</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  <script type="module">
+    import { getServiceUrl } from "/js-lib/urlConfig.js";
+    function setDiagnostics(message = "") {
+      const bannerEl = document.getElementById("diagnosticsBanner");
+      if (!bannerEl) {
+        return;
+      }
+
+      if (!message) {
+        bannerEl.textContent = "";
+        bannerEl.style.display = "none";
+        return;
+      }
+
+      const traceId = new Date().toISOString().replace(/[\-:.TZ]/g, "").slice(0, 14);
+      bannerEl.textContent = `${message} (trace: ${traceId})`;
+      bannerEl.style.display = "block";
+    }
+
+    // This function returns the schedule for the current week,
+    // which is needed to map pick codes (H/A) to actual team names in the grid sheet.
+    async function fetchWeeklySchedule() {
+      const apiEndpoint = await getServiceUrl("getSchedule");
+      const response = await fetch(apiEndpoint);
+      if (!response.ok) {
+        throw new Error(`getSchedule failed with status ${response.status}`);
+      }
+
+      // Some API responses place the real JSON inside response.body as a string.
+      const payload = await response.json();
+      const parsedBody = parseNestedJson(payload?.body ?? payload);
+      const scheduleData = parseNestedJson(parsedBody);
+      console.log("Fetched schedule data:", scheduleData);
+      return scheduleData;
+    }
+
+    function parseNestedJson(value) {
+      return typeof value === "string" ? JSON.parse(value) : value;
+    }
+
+    async function fetchAllUserPicks() {
+      const apiEndpoint = await getServiceUrl("getAllFBPPicksPython");
+      const response = await fetch(apiEndpoint);
+      if (!response.ok) {
+        throw new Error(
+          `getAllFBPPicksPython failed with status ${response.status}`,
+        );
+      }
+
+      const payload = await response.json();
+      // Some API responses place the real JSON inside response.body as a string.
+      const parsedBody = parseNestedJson(payload?.body ?? payload);
+      const picksData = parseNestedJson(parsedBody);
+
+      console.log("Fetched grid sheet data:", picksData);
+      return Array.isArray(picksData) ? picksData : [];
+    }
+
+    function selectGamesForWeek(scheduleData, week) {
+      return scheduleData
+        .map((game) => (typeof game === "string" ? JSON.parse(game) : game))
+        .filter((game) => String(game?.Week ?? "") === String(week));
+    }
+
+    function replacePickCodesWithTeams(scheduleData, picksData) {
+      return picksData.map((userRow) => {
+        const picksString = String(userRow?.picks ?? "");
+        if (!picksString) {
+          return { ...userRow, picks: "" };
+        }
+
+        const week = userRow?.week ?? userRow?.Week ?? scheduleData?.[0]?.Week;
+        const gamesForWeek = selectGamesForWeek(scheduleData, week);
+        if (gamesForWeek.length === 0) {
+          return { ...userRow };
+        }
+
+        const mappedPicks = picksString
+          .split("")
+          .map((pick, index) => {
+            const game = gamesForWeek[index];
+            if (!game) {
+              return pick;
+            }
+            if (pick === "H") {
+              return game.Home;
+            }
+            if (pick === "A") {
+              return game.Away;
+            }
+            return pick;
+          })
+          .join(" ");
+
+        return {
+          ...userRow,
+          picks: mappedPicks,
+        };
+      });
+    }
+
+    function renderWeeklyGridSheet(rows, scheduleData) {
+      const tableBody = document.querySelector("#gridSheetTable tbody");
+      if (!tableBody) {
+        return;
+      }
+      const domain = "https://my-fbp.com";
+      tableBody.innerHTML = "";
+      rows.forEach((userPick) => {    // userPick.picks is a string of team names separated by spaces, in the same order as the games in the schedule data.
+        const row = document.createElement("tr");
+        const displayNameCell = document.createElement("td");
+        const picksCell = document.createElement("td");
+        const tieBreakerCell = document.createElement("td");
+
+        displayNameCell.textContent = userPick.displayName ?? "";
+        const pickList = (userPick.picks ?? "").split(" ").filter(Boolean);
+
+        pickList.forEach((teamName, i) => {
+          const img = document.createElement("img");
+          img.src = `${domain}/images/${teamName}.gif`;
+          img.alt = teamName;
+          img.className = "pick-img";
+
+          const wrap = document.createElement("span");
+          wrap.className = "tooltip-wrap";
+
+          const tip = document.createElement("span");
+          tip.className = "tooltip";
+          const game = scheduleData[i];
+          if (game) {
+            const isUnderdog =
+              (teamName === game.Home && game.Underdog === "H") ||
+              (teamName === game.Away && game.Underdog === "A");
+            const spread = isUnderdog ? `+${game.Spread}` : `-${game.Spread}`;
+            tip.textContent = `${teamName} ${spread}`;
+          } else {
+            tip.textContent = teamName;
+          }
+
+          wrap.appendChild(img);
+          wrap.appendChild(tip);
+          picksCell.appendChild(wrap);
+        });
+        tieBreakerCell.textContent = userPick.tieBreaker ?? "";
+
+        row.appendChild(displayNameCell);
+        row.appendChild(picksCell);
+        row.appendChild(tieBreakerCell);
+        tableBody.appendChild(row);
+      });
+    }
+
+    async function loadGridSheet() {
+      const timestampEl = document.getElementById("timestamp");
+      if (timestampEl) {
+        timestampEl.textContent = new Date().toLocaleString();
+      }
+
+      try {
+        setDiagnostics("");
+        const scheduleData = await fetchWeeklySchedule();
+        const picksData = await fetchAllUserPicks();
+        //
+
+        const rows = replacePickCodesWithTeams(scheduleData, picksData);
+        // You need to pass the schedule data to function
+        // so that you can show the spread in the hover text.
+
+        renderWeeklyGridSheet(rows, scheduleData);
+        setDiagnostics("");
+      } catch (error) {
+        console.error("Error loading weekly gridsheet:", error);
+        setDiagnostics(`Load error: ${error?.message || "Unknown error"}`);
+        alert("Unable to load weekly gridsheet right now.");
+      }
+    }
+
+
+    async function generatePDF(html, filename) {
+
+      const apiEndpoint = await getServiceUrl("htmlToPdf");
+      const response = await fetch(`${apiEndpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html, filename })
+      });
+      const data = await response.json();
+      const body = JSON.parse(data.body);
+      console.log("Response from HTML to PDF API:", response.status, body);
+      alert(`PDF generated successfully. Download URL: ${body.download_url}`);
+    }
+    document.addEventListener("DOMContentLoaded", async () => {
+      await loadGridSheet();
+      const yearStr = String(new Date().getFullYear());
+      const fileName = `gridsheet_week_${window.currentWeek}_${yearStr}.pdf`;
+      await generatePDF(document.documentElement.outerHTML, fileName);
+    });
+
+  </script>
+</body>
+
+</html>

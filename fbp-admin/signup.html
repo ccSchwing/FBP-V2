@@ -1,0 +1,343 @@
+<!doctype html>
+<html>
+
+<head>
+  <style>
+    .signup-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      padding: 2.5rem 2rem 2rem 2rem;
+      max-width: 420px;
+      margin: 2.5rem auto 2rem auto;
+      border: 1px solid #e5e7eb;
+    }
+
+    .signup-card h1 {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 1.5rem;
+    }
+
+    .signup-card form>div {
+      margin-bottom: 1.25rem;
+    }
+
+    .signup-card label {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-weight: 500;
+      color: #222;
+    }
+
+    .signup-card input[type="text"],
+    .signup-card input[type="email"],
+    .signup-card input[type="password"] {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 1rem;
+      background: #f9fafb;
+      transition: border 0.2s;
+    }
+
+    .signup-card input[type="text"]:focus,
+    .signup-card input[type="email"]:focus,
+    .signup-card input[type="password"]:focus {
+      border: 1.5px solid #1976d2;
+      outline: none;
+      background: #fff;
+    }
+
+    .signup-card input[type="checkbox"],
+    .signup-card input[type="radio"] {
+      margin-right: 0.5em;
+      accent-color: #1976d2;
+    }
+
+    .signup-card #defaultAlgorithm label {
+      display: inline;
+      margin-right: 0.5em;
+      font-weight: 400;
+    }
+
+    .signup-card button,
+    .signup-card input[type="submit"] {
+      background: #1976d2;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.7rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: background 0.2s;
+      box-shadow: 0 2px 8px rgba(25, 118, 210, 0.08);
+    }
+
+    .signup-card button:hover,
+    .signup-card input[type="submit"]:hover {
+      background: #1251a3;
+    }
+  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="/js-lib/oidc-client-ts.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+  <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+  <title>Add New FBP User</title>
+  <script type="module">
+    import { auth } from "/js/auth.js";
+    await auth.ensureAuthenticated();
+  </script>
+
+  <script type="module">
+    async function validateFormData() {
+      let errorMessages = [];
+      const firstName = document.getElementById("firstName").value.trim();
+      const lastName = document.getElementById("lastName").value.trim();
+      const displayName = document.getElementById("displayName").value.trim();
+      const defaultTieBreaker = document.getElementById("defaultTieBreaker").value.trim();
+      if (firstName === "") {
+        errorMessages.push("First Name cannot be empty.");
+      }
+      if (lastName === "") {
+        errorMessages.push("Last Name cannot be empty.");
+      }
+      if (displayName === "") {
+        errorMessages.push("Display Name cannot be empty.");
+      }
+      if (defaultTieBreaker === "") {
+        errorMessages.push("Default Tie Breaker cannot be empty.");
+      }
+      if (isNaN(defaultTieBreaker)) {
+        errorMessages.push("Default Tie Breaker must be a number.");
+      }
+      const defaultAlgorithm = document.querySelector(
+        'input[name="defaultAlgorithm"]:checked',
+      );
+      if (!defaultAlgorithm) {
+        errorMessages.push("Please select a default algorithm for picks.");
+      }
+      return errorMessages;
+    }
+    window.validateFormData = validateFormData;
+  </script>
+
+
+
+  <script type="module">
+    import { getServiceUrl } from "/js-lib/urlConfig.js";
+    async function AddNewUser() {
+      const validationErrors = await window.validateFormData();
+      if (validationErrors.length > 0) {
+        alert("Please fix the following errors:\n\n" + validationErrors.join("\n"));
+        return;
+      }
+      try {
+        const lambdaURL = await getServiceUrl("addFBPUserPython");
+        let formData = new FormData(document.forms.addFBPUser);
+        const response = await fetch(lambdaURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            firstName: formData.get("firstName"),
+            lastName: formData.get("lastName"),
+            email: formData.get("email"),
+            displayName: formData.get("displayName"),
+            isAdmin: formData.get("isAdmin") === "on",
+            userType: formData.get("userType"),
+            isAccountLocked: formData.get("isAccountLocked") === "on",
+            isPaidUser: formData.get("isPaidUser") === "on",
+            emailPickSheet: formData.get("emailPickSheet") === "on",
+            emailReminders: formData.get("emailReminders") === "on",
+            emailGridSheet: formData.get("emailGridSheet") === "on",
+            defaultAlgorithm:
+              document.querySelector('input[name="defaultAlgorithm"]:checked')
+                ?.value || "random",
+            defaultTieBreaker: formData.get("defaultTieBreaker"),
+          }),
+        });
+        const data = await response.text();
+        if (data.includes("already exists")) {
+          alert("User already exists.");
+          return;
+        }
+        const userAdded = await GetNewUser(formData.get("email"));
+        const email = formData.get("email");
+        const firstName = formData.get("firstName");
+        // Now you can use email and firstName to send a welcome email
+        if (userAdded === true) {
+          alert("User added successfully! " + userAdded);
+          // You can now use email and firstName to send a welcome email
+          console.log("Welcome email can be sent to:", email, "for user:", firstName);
+          const emailResponse = sendWelcomeEmail(email, firstName);
+          console.log("Email response:", emailResponse);
+        } else {
+          alert(
+            "Could not verify user creation.  Check AWS logs for details",
+          );
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        alert("Error adding user: " + error.message);
+      }
+    }
+    window.AddNewUser = AddNewUser;
+    
+    async function GetNewUser(emailAddr) {
+      if (!emailAddr || emailAddr === "undefined") {
+        alert("Please enter a valid email address.");
+        return false;
+      }
+      try {
+        const newUserURL = await getServiceUrl("getFBPUserPython");
+        const response = await fetch(`${newUserURL}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: emailAddr }),
+        });
+        const data = await response.text();
+        console.log("Response:", data);
+        if (response.ok && data) {
+          alert("New user data: " + data);
+          return true;
+        } else {
+          return false;
+        }
+      } catch (error) {
+        alert("Error fetching user: " + error.message);
+        console.error("Error:", error);
+        return false;
+      }
+    }
+    window.GetNewUser = GetNewUser;
+
+    async function sendWelcomeEmail(email, firstName) {
+      const templateName = "WelcomeEmailTemplate";
+      try {
+        const emailURL = await getServiceUrl("sendEmail");
+        const response = await fetch(`${emailURL}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: email, firstName: firstName, templateName: templateName }),
+        });
+        const data = await response.text();
+        console.log("sendEmail Lambda Response:", data);
+        if (response.ok) {
+          return data;
+        } else {
+          alert("Failed to send welcome email. Check AWS logs for details.");
+          throw new Error("Failed to send welcome email");
+        }
+      } catch (error) {
+        console.error("Error sending welcome email:", error);
+        alert("Error sending welcome email: " + error.message);
+        return null;
+      }
+    }
+  </script>
+</head>
+
+<body class="fbp-home">
+  <div class="container">
+    <header>
+      <h1>Add FBP User</h1>
+    </header>
+    <script type="module">
+      import { initAdminNav } from "/js-lib/adminNav.js";
+      await initAdminNav();
+    </script>
+    <div style="display:flex; gap:2rem; align-items:flex-start;">
+      <aside class="nav-choices">
+        <!-- populated by adminNav.js -->
+      </aside>
+      <div class="signup-card">
+        <h1>Fill in the form to create an FBP user.</h1>
+        <form name="addFBPUser">
+          <div>
+            <label for="firstName">First Name:</label>
+            <input type="text" name="firstName" id="firstName" />
+          </div>
+          <div>
+            <label for="lastName">Last Name:</label>
+            <input type="text" name="lastName" id="lastName" />
+          </div>
+          <div>
+            <label for="email">Email:</label>
+            <input type="email" name="email" id="email" />
+          </div>
+          <div>
+            <label for="displayName">Display Name:</label>
+            <input type="text" name="displayName" id="displayName" />
+          </div>
+          <div style="
+              display: flex;
+              flex-direction: column;
+              gap: 0.5em;
+              margin-bottom: 1.25rem;
+            ">
+            <span class="custom-checkbox"><label style="display: flex; align-items: center"><input type="checkbox"
+                  name="isAdmin" id="isAdmin" /><span class="checkmark"></span><span style="margin-left: 0.5em">Is
+                  Admin</span></label></span>
+            <span class="custom-radio"><label style="display: flex; align-items: center"><input type="radio"
+                  value="system" name="userType" id="system" /><span class="checkmark"></span><span
+                  style="font-weight: 400; margin-left: 0.5em">System User</span></label></span>
+            <span class="custom-radio"><label style="display: flex; align-items: center"><input type="radio"
+                  value="user" name="userType" id="user" checked /><span class="checkmark"></span><span
+                  style="font-weight: 400; margin-left: 0.5em">Player User</span></label></span>
+            <span class="custom-checkbox"><label style="display: flex; align-items: center"><input type="checkbox"
+                  name="emailPickSheet" id="emailPickSheet" /><span class="checkmark"></span><span
+                  style="margin-left: 0.5em">Email PickSheet</span></label></span>
+            <span class="custom-checkbox"><label style="display: flex; align-items: center"><input type="checkbox"
+                  name="emailReminders" id="emailReminders" /><span class="checkmark"></span><span
+                  style="margin-left: 0.5em">Email Reminder</span></label></span>
+            <span class="custom-checkbox"><label style="display: flex; align-items: center"><input type="checkbox"
+                  name="emailGridSheet" id="emailGridSheet" /><span class="checkmark"></span><span
+                  style="margin-left: 0.5em">Email Gridsheet</span></label></span>
+            <span class="custom-checkbox"><label style="display: flex; align-items: center"><input type="checkbox"
+                  name="isAccountLocked" id="isAccountLocked" /><span class="checkmark"></span><span
+                  style="margin-left: 0.5em">Is Account Locked</span></label></span>
+            <span class="custom-checkbox"><label style="display: flex; align-items: center"><input type="checkbox"
+                  name="isPaidUser" id="isPaidUser" /><span class="checkmark"></span><span style="margin-left: 0.5em">Is
+                  Paid User</span></label></span>
+          </div>
+          <label for="DefaultAlgorithm" style="margin-bottom: 0.25em; font-weight: 500">Default for Picks when you don't
+            make picks:</label>
+          <div style="display: flex; flex-direction: column; gap: 0.25em">
+            <span class="custom-radio"><label style="display: flex; align-items: center"><input type="radio"
+                  value="away" name="defaultAlgorithm" id="alg-away" /><span class="checkmark"></span><span
+                  style="font-weight: 400; margin-left: 0.5em">Away Teams</span></label></span>
+            <span class="custom-radio"><label style="display: flex; align-items: center"><input type="radio"
+                  value="home" name="defaultAlgorithm" id="alg-home" /><span class="checkmark"></span><span
+                  style="font-weight: 400; margin-left: 0.5em">Home Teams</span></label></span>
+            <span class="custom-radio"><label style="display: flex; align-items: center"><input type="radio"
+                  value="favorites" name="defaultAlgorithm" id="alg-favorites" /><span class="checkmark"></span><span
+                  style="font-weight: 400; margin-left: 0.5em">Favorites</span></label></span>
+            <span class="custom-radio"><label style="display: flex; align-items: center"><input type="radio"
+                  value="underdogs" name="defaultAlgorithm" id="alg-underdogs" /><span class="checkmark"></span><span
+                  style="font-weight: 400; margin-left: 0.5em">UnderDogs</span></label></span>
+            <span class="custom-radio"><label style="display: flex; align-items: center"><input type="radio"
+                  value="random" name="defaultAlgorithm" id="alg-random" checked /><span class="checkmark"></span>
+                <span style="font-weight: 400; margin-left: 0.5em">Random</span></label></span>
+            <div>
+            </div>
+            <div>
+              <label for="defaultTieBreaker">Default Tie Breaker:</label>
+              <input type="text" maxlength="2" name="defaultTieBreaker" id="defaultTieBreaker" />
+            </div>
+          </div>
+        </form>
+        <button onclick="AddNewUser()">Register</button>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

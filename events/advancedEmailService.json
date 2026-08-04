@@ -1,0 +1,9 @@
+{
+  "email_type": "picksheet",
+  "recipient": "chuckschwing@proton.me", 
+  "data": {
+    "user_name": "Chuck Schwing",
+    "activation_link": "https://my-fbp.com/",
+    "reply_to": "fbpadmin@my-fbp.com"
+  }
+}

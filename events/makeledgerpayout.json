@@ -1,0 +1,22 @@
+{
+  "version": "2.0",
+  "routeKey": "POST /payout",
+  "rawPath": "/payout",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": "{\"payoutAmount\":40, \"email\":\"slept-that-vacant@duck.com\"}",
+  "requestContext": {
+    "http": {
+      "method": "POST",
+      "path": "/payout",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    },
+    "routeKey": "POST /payout",
+    "stage": "$default"
+  },
+  "isBase64Encoded": false
+}

@@ -1,0 +1,64 @@
+
+I don't want to do this right now, but: in my AdvancedEmailService.py and 
+AdvancedSMSService.py, I'm thinking that I would like to extract the html 
+and text that I send in the email, and extract the text for SMS into files 
+that I read upon execution. I want to do this because I'd like to be able 
+to specify a different file for input to the Email or the SMS Lambdas. 
+Is a Dictionary the right approach? If I define my default Dictionary in the lambda, 
+I'd like to be able to override that particular Dictionary entry with the filename 
+from the event. I want to be able to send ad hoc messages via Email and SMS.
+
+
+Context
+Good idea — it'll make your Lambdas much more flexible. A dictionary is the right approach. Here's the pattern:
+
+Default template dictionary (defined in the Lambda):
+
+DEFAULT_TEMPLATES = {
+    SMSType.WELCOME: "templates/sms_welcome.txt",
+    SMSType.REMINDER: "templates/sms_reminder.txt",
+}
+
+Override from the event — merge the default with whatever comes in:
+
+templates = {**DEFAULT_TEMPLATES, **body.get('templates', {})}
+
+This means if the event includes {"templates": {"welcome": "templates/sms_welcome_v2.txt"}} it overrides just that entry, everything else stays default.
+
+Then read the file at send time:
+
+def _load_template(self, path: str, data: dict) -> str:
+    with open(path) as f:
+        return f.read().format(**data)
+
+Using .format(**data) lets your template files use placeholders like Hi {user_name}, welcome to {company_name}! which get filled from request.data.
+
+For ad hoc messages you could add a special key:
+
+SMSType.ADHOC = "adhoc"
+
+Where the event just passes body text directly, bypassing the template lookup entirely.
+
+A couple of things to think about before you implement:
+
+Template files need to be bundled in your Lambda deployment package, 
+so keep them in a templates/ folder alongside your handler
+
+For Email you'll want separate keys for html and text versions, e.g. 
+SMSType.WELCOME_HTML and SMSType.WELCOME_TEXT, or nest them: {"welcome": {"html": "...", "text": "..."}}
+
+
+Store the message files in the s3 bucket:
+Even better — storing them in S3 means you can update message 
+content without touching the Lambda at all. Just swap the file 
+in S3 and the next invocation picks it up automatically.
+
+A few things to keep in mind when you go that route:
+
+Your Lambda execution role will need s3:GetObject on that bucket/prefix
+
+You'd use boto3.client('s3').get_object() instead of open() to read the file
+
+Consider caching the template content in memory (outside lambda_handler) 
+to avoid an S3 call on every invocation — just be aware cached content 
+persists for the lifetime of the Lambda container

@@ -1,0 +1,23 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /openPool",
+  "rawPath": "/openPool",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "requestContext": {
+    "apiId": "local",
+    "requestId": "local-request-id",
+    "http": {
+      "method": "GET",
+      "path": "/openPool",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    },
+    "routeKey": "GET /openPool",
+    "stage": "$default"
+  },
+  "isBase64Encoded": false
+}

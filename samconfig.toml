@@ -1,0 +1,17 @@
+version = 0.1
+[default.build.parameters]
+use_container = true
+
+[default.deploy.parameters]
+stack_name = "fbp"
+s3_bucket = "my-fbp.com-v2"
+resolve_s3 = false
+s3_prefix = "fbp"
+template_file = ".aws-sam/build/template.yaml"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "FBPUsersTableName=\"FBP-Users\" FBPConfigTableName=\"FBP-Config\" FBPScheduleTableName=\"2025-Schedule\" FBPPicksTableName=\"FBP-Picks\" FBPLogsTableName=\"2025-Log\" FBPWeeklyResultsTableName=\"FBP-Weekly-Results\" FBPWeeklyResultsWeekIndexName=\"WeekIndex\" S3BucketName=\"my-fbp.com\" SESBucketName=\"my-fbp-inbound-email\""
+image_repositories = []
+
+[default.global.parameters]
+region = "us-east-1"

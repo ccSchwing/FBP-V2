@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fbplib"
+version = "0.1.0"
+description = "Shared utility library for FBP Lambda functions"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3",
+    "aws-lambda-powertools",
+    "pytz"
+]
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["FBPLib*"]

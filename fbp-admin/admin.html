@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Home</title>
+
+  <script src="/js-lib/oidc-client-ts.min.js"></script>
+
+  <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+  <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+
+  <script type="module">
+    import { auth } from "/js/auth.js";
+    await auth.ensureAuthenticated();
+  </script>
+  <script type="module">
+    import { getCurrentWeek } from "/js-lib/fbpUtils.js";
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      try {
+        const currentWeek = await getCurrentWeek();
+        document.getElementById("current-week").textContent = currentWeek;
+        console.log("Current week data:", currentWeek);
+      } catch (error) {
+        console.error("Error fetching current week data:", error);
+        alert("Failed to load current week data. Please try again later.");
+      }
+    });
+  </script>
+</head>
+
+<body class="fbp-admin">
+  <header>
+    <h1 style="text-align: center;">Admin Home</h1>
+  </header>
+  <div class="container" style="display:flex; gap:2rem; align-items:flex-start; margin:0; max-width:100%;">
+    <script type="module">
+      import { initAdminNav } from "/js-lib/adminNav.js";
+      await initAdminNav();
+    </script>
+    <aside class="nav-choices">
+      <!-- populated by adminNav.js -->
+    </aside>
+    <main class="results-main">
+      <p>Welcome to the FBP Admin Dashboard</p>
+      <div class="callout">Current Week: <span id="current-week"></span></div>
+    </main>
+  </div>
+  <div id="chat-widget">
+    <button id="chat-toggle" onclick="document.getElementById('chat-widget').classList.toggle('open')"
+      aria-label="Toggle chat">
+      💬 FBP Assistant
+    </button>
+    <div id="chat-body">
+      <div id="chat-messages"></div>
+      <div id="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Ask me about FBP..." autocomplete="off">
+        <button id="chat-send" onclick="window.sendChatBotMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    import { sendChatBotMessage } from "/js-lib/chatbot.js";
+    window.sendChatBotMessage = sendChatBotMessage;
+  </script>
+
+</body>
+
+</html>

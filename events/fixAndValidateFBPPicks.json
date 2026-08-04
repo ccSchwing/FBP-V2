@@ -1,0 +1,25 @@
+{
+  "version": "2.0",
+  "routeKey": "POST /validateAndFixFBPPicks",
+  "rawPath": "/validateAndFixFBPPicks",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": "{\"email\": \"chuckschwing@proton.me\", \"picks\": \"\", \"tieBreaker\": \"55\"}",
+  
+  "requestContext": {
+    "routeKey": "POST /validateAndFixFBPPicks",
+    "stage": "$default",
+    "requestId": "local-request-id",
+    "apiId": "local",
+    "http": {
+      "method": "POST",
+      "routeKey": "POST /validateAndFixFBPPicks",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    }
+  },
+  "isBase64Encoded": false
+}

@@ -1,0 +1,654 @@
+<!doctype html>
+<html>
+
+<head>
+  <!-- Removed local menu/nav CSS to avoid conflicts; using global styles.css for menu and nav. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="/js-lib/oidc-client-ts.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+  <style>
+    .tooltip-wrap {
+      position: relative;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .tooltip-wrap .tooltip {
+      visibility: hidden;
+      background: #333;
+      color: #fff;
+      font-size: 0.75rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      position: absolute;
+      bottom: 110%;
+      left: 0;
+      white-space: nowrap;
+      z-index: 10;
+    }
+
+
+    .tooltip-wrap:hover .tooltip {
+      visibility: visible;
+    }
+
+    /* Override page-title positioning to not cover menu button */
+    .page-title {
+      position: static;
+      transform: none;
+      left: auto;
+    }
+
+    .phone-verification-card {
+      border: 1px solid #d7dce5;
+      border-radius: 12px;
+      padding: 1rem;
+      background: linear-gradient(180deg, #fafbfd 0%, #f3f6fb 100%);
+      width: min(100%, 34rem);
+      margin-bottom: 1.25rem;
+    }
+
+    .phone-verification-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .phone-verification-title {
+      font-weight: 600;
+    }
+
+    .phone-verification-state {
+      border-radius: 999px;
+      padding: 0.2rem 0.65rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .phone-verification-state[data-state="not-set"] {
+      background: #eef2f7;
+      color: #435066;
+    }
+
+    .phone-verification-state[data-state="pending"] {
+      background: #fff1cc;
+      color: #8a5a00;
+    }
+
+    .phone-verification-state[data-state="verified"] {
+      background: #dff5e8;
+      color: #1c6b40;
+    }
+
+    .phone-verification-message {
+      margin: 0 0 0.85rem;
+      color: #4b5567;
+      font-size: 0.92rem;
+    }
+
+    .phone-verification-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.65rem;
+    }
+
+    .phone-verification-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .phone-verification-card #MobileNumber {
+      width: 12.5rem;
+      min-width: 12.5rem;
+      box-sizing: border-box;
+    }
+
+    .phone-verification-card #MobileNumberVerification {
+      width: 6.5rem;
+      min-width: 6.5rem;
+      box-sizing: border-box;
+    }
+
+    .phone-verification-card #verifySMSMobileNumberBtn {
+      width: 11ch;
+      min-width: 11ch;
+    }
+  </style>
+
+  <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+  <title>User Profile</title>
+  <script type="module">
+    (async () => {
+      const { auth } = await import("/js/auth.js");
+      await auth.ensureAuthenticated();
+      const user = await auth.getUser();
+      console.log("Authenticated user:", user);
+      window.user = user;
+
+      // Now call getUserStatus after user is loaded
+      const { getUserStatus } = await import("/js-lib/userUtils.js");
+      await getUserStatus();
+    })();
+  </script>
+  <title>View/Mod My Profile</title>
+  <script type="module">
+    import { getServiceUrl } from "/js-lib/urlConfig.js";
+
+    let email = null;
+    let originalMobileNumberDigits = "";
+
+    function normalizePhoneDigits(value) {
+      return (value || "").toString().replace(/\D/g, "").slice(0, 10);
+    }
+
+    async function resolveUserEmail() {
+      if (email) return email;
+      const { auth } = await import("/js/auth.js");
+      const user = await auth.getUser();
+      email = user?.profile?.email ?? null;
+      console.log("User email:", email);
+      return email;
+    }
+    window.resolveUserEmail = resolveUserEmail;
+
+    let cachedProfileData = null;
+
+    async function getUserProfile() {
+      try {
+        let response = null;
+        const resolvedEmail = await resolveUserEmail();
+        if (!resolvedEmail) {
+          alert("No authenticated user email found. Please contact fbpadmin@my-fbp.com.");
+          return null;
+        }
+        const URL_KEY = "getFBPUserPython";
+        const lambdaURL = await getServiceUrl(URL_KEY);
+        response = await fetch(lambdaURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: resolvedEmail,
+          }),
+        });
+        const data = await response.text();
+        console.log("Response:", data);
+        window.userProfileData = JSON.parse(data);
+        // I know I shouldn't do this, but:
+        loadFormData(window.userProfileData);
+        window.dispatchEvent(
+          new CustomEvent("userProfileDataLoaded", {
+            detail: window.userProfileData,
+          }),
+        );
+        return window.userProfileData;
+      } catch (error) {
+        alert("Failed to load user profile. Contact fbpadmin@my-fbp.com" + (error.message || error));
+        return null;
+      }
+    }
+    async function loadFormData(userProfileData) {
+      if (!userProfileData) {
+        console.warn("No user profile data available to pre-fill form.");
+        return;
+      }
+      window.userProfileData = userProfileData || {};
+      console.log(
+        "loadFormdata called with userProfileData:",
+        window.userProfileData,
+      );
+      let responseBody = JSON.parse(window.userProfileData.body);
+      console.log("Response body:", responseBody);
+      document.getElementById("firstName").value =
+        responseBody.firstName || "";
+      document.getElementById("lastName").value = responseBody.lastName || "";
+      document.getElementById("displayName").value =
+        responseBody.displayName || "";
+      const paymentMethod = responseBody.paymentMethod || "";
+      const paymentRadioButtons = document.querySelectorAll(
+        'input[name="paymentMethod"]',
+      );
+      paymentRadioButtons.forEach((radio) => {
+        radio.checked = radio.value === paymentMethod;
+      });
+      document.getElementById("smsReminder").checked =
+        responseBody.smsReminder || false;
+      document.getElementById("smsPickSheet").checked =
+        responseBody.smsPickSheet || false;
+      document.getElementById("smsGridSheet").checked =
+        responseBody.smsGridSheet || false;
+      document.getElementById("emailPickSheet").checked =
+        responseBody.emailPickSheet || false;
+      document.getElementById("emailReminders").checked =
+        responseBody.emailReminders || false;
+      document.getElementById("emailGridSheet").checked =
+        responseBody.emailGridSheet || false;
+      const defaultAlgorithm = responseBody.defaultAlgorithm || "";
+      const radioButtons = document.querySelectorAll(
+        'input[name="defaultAlgorithm"]',
+      );
+      radioButtons.forEach((radio) => {
+        radio.checked = radio.value === defaultAlgorithm;
+      });
+      document.getElementById("defaultTieBreaker").value =
+        responseBody.defaultTieBreaker || "";
+      const savedMobileNumber = responseBody.mobile_number || "";
+      originalMobileNumberDigits = normalizePhoneDigits(savedMobileNumber);
+      document.getElementById("MobileNumber").value = formatPhoneNumber(savedMobileNumber);
+    }
+
+    async function validateFormData() {
+      const tieBreakerInput = document.getElementById("defaultTieBreaker");
+      const tieBreakerValue = tieBreakerInput.value.trim();
+      let errorMessages = [];
+      const firstName = document.getElementById("firstName").value.trim();
+      const lastName = document.getElementById("lastName").value.trim();
+      const displayName = document.getElementById("displayName").value.trim();
+      if (firstName === "") {
+        errorMessages.push("First Name cannot be empty.");
+      }
+      if (lastName === "") {
+        errorMessages.push("Last Name cannot be empty.");
+      }
+      if (displayName === "") {
+        errorMessages.push("Display Name cannot be empty.");
+      }
+      const paymentMethod = document.querySelector(
+        'input[name="paymentMethod"]:checked',
+      );
+      if (!paymentMethod) {
+        errorMessages.push("Please select a payment method for when you win.");
+      }
+      if (tieBreakerValue === "") {
+        errorMessages.push("Default Monday Night Tiebreaker cannot be empty.");
+      }
+      const defualtAlgorithm = document.querySelector(
+        'input[name="defaultAlgorithm"]:checked',
+      );
+      if (!defualtAlgorithm) {
+        errorMessages.push("Please select a default algorithm for picks.");
+      }
+      const tieBreakerNumber = Number(tieBreakerValue);
+      if (
+        isNaN(tieBreakerNumber) ||
+        tieBreakerNumber < 0 ||
+        tieBreakerNumber > 99
+      ) {
+        errorMessages.push("Default Monday Night Tiebreaker must be a number between 0 and 99.");
+      }
+      return errorMessages;
+    }
+    async function updateUserProfile() {
+      const dataValid = await validateFormData(); // an array of strings.
+      if (dataValid.length > 0) {
+        alert("Please fix the following errors before submitting:\n" + dataValid)
+        return;
+      }
+      try {
+        const lambdaURL = await getServiceUrl("updateFBPUserPython");
+        const formData = new FormData(document.forms.addFBPUser);
+        const mobileNumberDigits = (formData.get("MobileNumber") || "")
+          .toString()
+          .replace(/\D/g, "")
+          .slice(0, 10);
+        if (mobileNumberDigits !== originalMobileNumberDigits) {
+          alert("Mobile number changes must be verified first. Use 'Text Me A Verification Code' and then 'Verify' before saving your profile.");
+          return;
+        }
+        const resolvedEmail = await resolveUserEmail();
+        if (!resolvedEmail) {
+          throw new Error("No authenticated user email found for update");
+        }
+        const existingProfile = window.userProfileData || {};
+
+        const requestPayload = {
+          email: resolvedEmail, // Use resolved email for update
+          firstName: formData.get("firstName"),
+          lastName: formData.get("lastName"),
+          email: resolvedEmail,
+          displayName: formData.get("displayName"),
+          paymentMethod:
+            document.querySelector('input[name="paymentMethod"]:checked')
+              ?.value || "",
+          isAdmin: formData.has("isAdmin")
+            ? formData.get("isAdmin") === "on"
+            : !!existingProfile.isAdmin,
+          isAccountLocked: formData.has("isAccountLocked")
+            ? formData.get("isAccountLocked") === "on"
+            : !!existingProfile.isAccountLocked,
+          isPaidUser: formData.has("isPaidUser")
+            ? formData.get("isPaidUser") === "on"
+            : !!existingProfile.isPaidUser,
+          paymentMethod:
+            document.querySelector('input[name="paymentMethod"]:checked')
+              ?.value || "",
+          emailPickSheet: formData.get("emailPickSheet") === "on",
+          emailReminders: formData.get("emailReminders") === "on",
+          emailGridSheet: formData.get("emailGridSheet") === "on",
+          smsReminder: formData.get("smsReminder") === "on",
+          smsPickSheet: formData.get("smsPickSheet") === "on",
+          smsGridSheet: formData.get("smsGridSheet") === "on",
+          defaultAlgorithm:
+            document.querySelector('input[name="defaultAlgorithm"]:checked')
+              ?.value || "",
+          defaultTieBreaker: formData.get("defaultTieBreaker") || "",
+        };
+
+        const response = await fetch(lambdaURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestPayload),
+        });
+
+        console.log(
+          "Response headers:",
+          Object.fromEntries(response.headers.entries()),
+        );
+        const responseData = await response.text();
+        console.log("Parsed response data:", responseData);
+
+        if (!response.ok) {
+          const errorBody =
+            typeof responseData === "string"
+              ? responseData
+              : JSON.stringify(responseData);
+          throw new Error(`Update failed (${response.status}): ${errorBody}`);
+        }
+
+        const successBody =
+          typeof responseData === "string"
+            ? responseData
+            : JSON.stringify(responseData);
+        alert("User updated successfully!");
+      } catch (error) {
+        console.error("Error:", error);
+        alert(error.message || "Update failed. Please contact fbpadmin@my-fbp.com " + (error.message || error));
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      userProfileData = await getUserProfile();
+      console.log("Profile data retrieved:", userProfileData);
+    });
+
+    const updateProfileButton = document.getElementById("updateProfileBtn");
+    if (updateProfileButton) {
+      updateProfileButton.addEventListener("click", updateUserProfile);
+    }
+    //});
+
+    resolveUserEmail().catch((error) => {
+      console.warn("User email not available during initial load:", error);
+    });
+  </script>
+  <script type="module">
+    import { formatPhoneNumber, initPhoneVerification } from "/js-lib/phoneVerification.js";
+
+    window.formatPhoneNumber = formatPhoneNumber;
+    window.phoneVerification = initPhoneVerification({
+      resolveUserEmail: () => window.resolveUserEmail(),
+    });
+  </script>
+</head>
+
+<body class="fbp-home">
+  <header>
+    <h1 class="page-title">User Profile</h1>
+  </header>
+  <script type="module">
+    import { initNav } from "/js-lib/nav.js";
+    await initNav();
+  </script>
+  <div class="container" style="display:flex; gap:2rem; align-items:flex-start; margin:0; max-width:100%;">
+    <aside class="nav-choices">
+      <!-- populated by nav.js -->
+    </aside>
+    <main class="results-main">
+      <h1>View or Modify My Profile</h1>
+      <form name="addFBPUser" autocomplete="off" data-lpignore="true">
+        <input type="text" name="fake-username" autocomplete="username" tabindex="-1" aria-hidden="true"
+          style="position: absolute; left: -9999px" />
+        <div>
+          <label for="firstName">First Name:</label>
+          <input type="text" name="firstName" id="firstName" autocomplete="off" autocorrect="off" autocapitalize="off"
+            spellcheck="false" data-lpignore="true" />
+        </div>
+        <div>
+          <label for="lastName">Last Name:</label>
+          <input type="text" name="lastName" id="lastName" autocomplete="off" autocorrect="off" autocapitalize="off"
+            spellcheck="false" data-lpignore="true" />
+        </div>
+        <div>
+          <label for="displayName">Display Name:</label>
+          <input type="text" name="displayName" id="displayName" />
+        </div>
+        <div id="paymentMethod" style="margin-bottom: 1.25rem;">
+          <label for="paymentMethod" style="margin-bottom:0.25em; font-weight:500; display:block;">Payment Method When
+            You Win</label>
+          <div class="payment-options">
+            <label class="payment-option" for="PayPal">
+              <input type="radio" value="PayPal" name="paymentMethod" id="PayPal">
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>PayPal</span>
+                <img src="/images/paypal.png" alt="PayPal">
+              </span>
+            </label>
+            <label class="payment-option" for="VenMo">
+              <input type="radio" value="VenMo" name="paymentMethod" id="VenMo">
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>VenMo</span>
+                <img src="/images/venmo.png" alt="VenMo">
+              </span>
+            </label>
+          </div>
+        </div>
+        <div>
+          <label style="margin-bottom:0.25em; font-weight:500; display:block;">Email Notifications</label>
+          <div class="notification-options">
+            <label class="payment-option" for="emailPickSheet">
+              <input type="checkbox" name="emailPickSheet" id="emailPickSheet" />
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>Email PickSheet</span>
+              </span>
+            </label>
+            <label class="payment-option" for="emailReminders">
+              <input type="checkbox" name="emailReminders" id="emailReminders" />
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>Email Reminder</span>
+              </span>
+            </label>
+            <label class="payment-option" for="emailGridSheet">
+              <input type="checkbox" name="emailGridSheet" id="emailGridSheet" />
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>Email Gridsheet</span>
+              </span>
+            </label>
+        </div>
+        <section id="smsOptin" class="phone-verification-card" aria-labelledby="mobileVerificationTitle">
+          <div class="phone-verification-header">
+            <label id="mobileVerificationTitle" class="phone-verification-title" for="MobileNumber">Mobile
+              Number</label>
+            <span id="mobileVerificationState" class="phone-verification-state" data-state="not-set">Not Set</span>
+          </div>
+          <p id="mobileVerificationMessage" class="phone-verification-message">Add a mobile number to enable SMS
+            notifications.</p>
+          <div class="phone-verification-row">
+            <input type="text" name="MobileNumber" id="MobileNumber" maxlength="14" size="15"
+              placeholder="(999) 999-9999" pattern="\(\d{3}\) \d{3}-\d{4}"
+              oninput="this.value = window.formatPhoneNumber(this.value)" />
+          </div>
+          <div class="phone-verification-row">
+            <label for="sendSMSVerificationCodeBtn">Send Verification Code:</label>
+            <input type="button" name="GenerateCode" id="sendSMSVerificationCodeBtn"
+              value="Text Me A Verification Code" />
+          </div>
+          <div class="phone-verification-row">
+            <label for="MobileNumberVerification">Verification Code:</label>
+            <input type="text" name="MobileNumberVerification" id="MobileNumberVerification" maxlength="6" size="6" />
+            <input type="button" id="verifySMSMobileNumberBtn" value="Verify" />
+          </div>
+        </section>
+        <div id="sms-notifications">
+          <label style="margin-bottom:0.25em; font-weight:500; display:block;">SMS Notifications</label>
+          <div class="notification-options">
+            <label class="payment-option" for="smsReminder">
+              <input type="checkbox" name="smsReminder" id="smsReminder" disabled />
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>SMS Reminder</span>
+              </span>
+            </label>
+            <label class="payment-option" for="smsPickSheet">
+              <input type="checkbox" name="smsPickSheet" id="smsPickSheet" disabled />
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>SMS PickSheet</span>
+              </span>
+            </label>
+            <label class="payment-option" for="smsGridSheet">
+              <input type="checkbox" name="smsGridSheet" id="smsGridSheet" disabled />
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>SMS GridSheet</span>
+              </span>
+            </label>
+          </div>
+        </div>
+        <div id="defaultAlgorithm" style="display: flex; flex-direction: column; gap: 0.5em; margin-bottom: 1.25rem;">
+          <label for="DefaultAlgorithm" style="margin-bottom:0.25em; font-weight:500;">Default for Picks when you
+            don't make picks:</label>
+          <div class="payment-options default-algorithm-options">
+            <label class="payment-option" for="alg-away">
+              <input type="radio" value="away" name="defaultAlgorithm" id="alg-away">
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>Away Teams</span>
+              </span>
+            </label>
+            <label class="payment-option" for="alg-home">
+              <input type="radio" value="home" name="defaultAlgorithm" id="alg-home">
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>Home Teams</span>
+              </span>
+            </label>
+            <label class="payment-option" for="alg-favorites">
+              <input type="radio" value="favorites" name="defaultAlgorithm" id="alg-favorites">
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>Favorites</span>
+              </span>
+            </label>
+            <label class="payment-option" for="alg-underdogs">
+              <input type="radio" value="underdogs" name="defaultAlgorithm" id="alg-underdogs">
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>Underdogs</span>
+              </span>
+            </label>
+            <label class="payment-option" for="alg-random">
+              <input type="radio" value="random" name="defaultAlgorithm" id="alg-random">
+              <span class="payment-option-ui">
+                <span class="check-box" aria-hidden="true"></span>
+                <span>Random</span>
+              </span>
+            </label>
+            <div class="payment-option-ui tie-breaker-card">
+              <span class="tie-breaker-input-wrap tooltip-wrap">
+                <input class="tie-breaker-input" type="text" name="defaultTieBreaker" id="defaultTieBreaker"
+                  maxlength="2" size="2">
+                <span class="tooltip">Enter the total points for the Monday Night Game (e.g., 42)</span>
+              </span>
+              <label class="tie-breaker-label" for="defaultTieBreaker">MNF Tiebreaker</label>
+            </div>
+          </div>
+        </div>
+      </form>
+      <script type="module">
+        // Prefill form when userProfileData is available
+        if (window.userProfileData) {
+          console.log(
+            "Pre-filling form with userProfileData:",
+            window.userProfileData,
+          );
+          window.addEventListener("userProfileDataLoaded", (event) => {
+            const userProfileData = event.detail;
+            console.log(
+              "Pre-filling form with loaded userProfileData:",
+              userProfileData,
+            );
+            let responseBody = JSON.parse(userProfileData.body);
+            document.getElementById("firstName").value =
+              responseBody.firstName || "";
+            document.getElementById("lastName").value =
+              responseBody.lastName || "";
+            document.getElementById("displayName").value =
+              responseBody.displayName || "";
+            const paymentMethod = responseBody.paymentMethod || "";
+            const paymentRadioButtons = document.querySelectorAll(
+              'input[name="paymentMethod"]',
+            );
+            paymentRadioButtons.forEach((radio) => {
+              radio.checked = radio.value === paymentMethod;
+            });
+            document.getElementById("emailPickSheet").checked =
+              responseBody.emailPickSheet || false;
+            document.getElementById("emailReminders").checked =
+              responseBody.emailReminders || false;
+            document.getElementById("emailGridSheet").checked =
+              responseBody.emailGridSheet || false;
+            const defaultAlgorithm = responseBody.defaultAlgorithm || "";
+            const radioButtons = document.querySelectorAll(
+              'input[name="defaultAlgorithm"]',
+            );
+            radioButtons.forEach((radio) => {
+              radio.checked = radio.value === defaultAlgorithm;
+            });
+            document.getElementById("MobileNumber").value =
+              formatPhoneNumber(responseBody.mobile_number || "");
+            originalMobileNumberDigits = normalizePhoneDigits(
+              responseBody.mobile_number || "",
+            );
+          });
+        }
+      </script>
+      <button id="updateProfileBtn" type="button">Update Profile</button>
+    </main>
+  </div>
+  <div id="chat-widget">
+    <button id="chat-toggle" onclick="document.getElementById('chat-widget').classList.toggle('open')"
+      aria-label="Toggle chat">
+      💬 FBP Assistant
+    </button>
+    <div id="chat-body">
+      <div id="chat-messages"></div>
+      <div id="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Ask me about FBP..." autocomplete="off">
+        <button id="chat-send" onclick="window.sendChatBotMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    import { sendChatBotMessage } from "/js-lib/chatbot.js";
+    window.sendChatBotMessage = sendChatBotMessage;
+  </script>
+
+  <footer>
+    <p>
+      Questions? Contact us at <a href="mailto:fbpadmin@my-fbp.com">fbpadmin@my-fbp.com</a>
+    </p>
+    <p>&copy; 2026 FBP. All rights reserved.</p>
+  </footer>
+</body>
+
+</html>

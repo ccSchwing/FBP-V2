@@ -1,0 +1,11 @@
+{
+	"httpMethod": "GET",
+	"path": "/presigned-url",
+	"headers": {
+		"Content-Type": "application/json"
+	},
+	"queryStringParameters": {
+		"key": "fbp-admin/weekly-results-sheet.json"
+	},
+	"isBase64Encoded": false
+}

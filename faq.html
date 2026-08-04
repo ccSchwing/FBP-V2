@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="/js-lib/oidc-client-ts.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+    <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+    <!-- <script type="module">
+        (async () => {
+            const { auth } = await import("/js/auth.js");
+            await auth.ensureAuthenticated();
+            const user = await auth.getUser();
+            console.log("Authenticated user:", user);
+            window.user = user;
+
+            // Now call getUserStatus after user is loaded
+            const { getUserStatus } = await import("/js-lib/userUtils.js");
+            await getUserStatus();
+        })().catch(console.error);
+    </script> -->
+    <title>FBP FAQ</title>
+
+    <style>
+        .faq {
+            max-width: 1100px;
+            margin: 2rem auto;
+            padding: 1rem;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            color: #111;
+        }
+
+        .faq__title {
+            font-size: 1.5rem;
+            margin: 0 0 0.5rem 0;
+        }
+
+        .faq__search-label {
+            display: block;
+            font-size: 0.875rem;
+            margin: 0.5rem 0 0.25rem;
+            color: #444;
+        }
+
+        .faq__search {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #dcdcdc;
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            margin-bottom: 1rem;
+        }
+
+        .faq__search:focus {
+            box-shadow: 0 0 0 3px rgba(51, 102, 255, 0.12);
+            outline: none;
+        }
+
+        /* Grid default: single column */
+        .faq__grid {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: 1fr;
+        }
+
+        /* Breakpoint: max-width:1023px (tablet / small desktop) */
+        @media (max-width: 1023px) {
+            .faq__grid {
+                grid-template-columns: 1fr;
+            }
+
+            .faq {
+                padding: 0.75rem;
+            }
+        }
+
+        /* Breakpoint: max-width:900px (narrow tablet / large phone) */
+        @media (max-width: 900px) {
+            .faq__grid {
+                grid-template-columns: 1fr;
+                gap: 0.9rem;
+            }
+
+            .faq__search {
+                font-size: 0.98rem;
+            }
+        }
+
+        /* Breakpoint: max-width:768px (phones) */
+        @media (max-width: 768px) {
+            .faq {
+                margin: 1rem auto;
+                padding: 0.5rem;
+            }
+
+            .faq__title {
+                font-size: 1.25rem;
+            }
+
+            .faq__grid {
+                gap: 0.75rem;
+            }
+
+            .faq__question {
+                padding: 1rem 0.75rem;
+            }
+        }
+
+        /* Breakpoint: min-width:1024px (large screens) — use 2 columns */
+        @media (min-width: 1024px) {
+            .faq__grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }
+
+            .faq {
+                padding: 1.25rem;
+            }
+        }
+
+        /* Item styles */
+        .faq__item {
+            border: 1px solid #e6e6e6;
+            border-radius: 8px;
+            padding: 0.5rem;
+            background: #fff;
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
+        }
+
+        /* Summary (question) */
+        .faq__question {
+            display: block;
+            cursor: pointer;
+            font-weight: 600;
+            padding: 0.75rem 0.5rem;
+            list-style: none;
+            position: relative;
+            user-select: none;
+            outline: none;
+        }
+
+        /* Focus */
+        .faq__question:focus {
+            box-shadow: 0 0 0 3px rgba(51, 102, 255, 0.18);
+            border-radius: 6px;
+        }
+
+        /* Plus/minus indicator */
+        .faq__question::after {
+            content: "+";
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-weight: 700;
+        }
+
+        .faq__item[open] .faq__question::after {
+            content: "−";
+        }
+
+        /* Answer area */
+        .faq__answer {
+            padding: 0 0.5rem 0.75rem 0.5rem;
+            color: #333;
+        }
+
+        /* Smooth collapse/expand when reduced-motion not preferred */
+        @media (prefers-reduced-motion: no-preference) {
+            .faq__answer {
+                transition: opacity 180ms ease, transform 180ms ease;
+            }
+
+            .faq__item:not([open]) .faq__answer {
+                opacity: 0;
+                transform: translateY(-4px);
+                height: 0;
+                overflow: hidden;
+            }
+
+            .faq__item[open] .faq__answer {
+                opacity: 1;
+                transform: translateY(0);
+                height: auto;
+                overflow: visible;
+            }
+        }
+
+        /* Hidden state used by JS when filtering */
+        .faq__item.faq__hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <script type="module">
+        // Searchable, keyboard-friendly FBP FAQ behavior
+        (() => {
+            const searchEl = document.getElementById('faq-search');
+            const listEl = document.getElementById('faq-list');
+            const items = Array.from(listEl.querySelectorAll('.faq__item'));
+
+            // Normalize text for searching
+            const normalize = (s) => s.toLowerCase().normalize('NFKD');
+
+            // Build searchable index
+            const index = items.map(item => {
+                const q = item.querySelector('.faq__question')?.textContent || '';
+                const a = item.querySelector('.faq__answer')?.textContent || '';
+                return { item, text: normalize(q + ' ' + a) };
+            });
+
+            // Filter function: shows matching items; highlights query in results
+            const filter = (query) => {
+                const q = normalize(query.trim());
+                let anyVisible = false;
+
+                index.forEach(({ item, text }) => {
+                    const matches = q === '' || text.includes(q);
+                    item.classList.toggle('faq__hidden', !matches);
+                    if (matches) {
+                        anyVisible = true;
+                    } else {
+                        // Close hidden items to avoid confusion
+                        item.removeAttribute('open');
+                    }
+                });
+
+                // Manage aria-live region for feedback (create if needed)
+                let live = document.getElementById('faq-live');
+                if (!live) {
+                    live = document.createElement('div');
+                    live.id = 'faq-live';
+                    live.setAttribute('aria-live', 'polite');
+                    live.style.position = 'absolute';
+                    live.style.left = '-9999px';
+                    live.style.width = '1px';
+                    live.style.height = '1px';
+                    live.style.overflow = 'hidden';
+                    document.body.appendChild(live);
+                }
+                live.textContent = anyVisible ? `${listEl.querySelectorAll('.faq__item:not(.faq__hidden)').length} results` : 'No results';
+            };
+
+            // Debounce helper
+            const debounce = (fn, ms = 150) => {
+                let t;
+                return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+            };
+
+            const debouncedFilter = debounce((e) => filter(e.target.value), 120);
+
+            searchEl.addEventListener('input', debouncedFilter);
+
+            // Keyboard: Space/Enter toggle for focused summary (prevent default page scroll)
+            document.addEventListener('keydown', (e) => {
+                if (e.key !== ' ' && e.key !== 'Spacebar' && e.key !== 'Enter') return;
+                const el = document.activeElement;
+                if (!el || el.tagName.toLowerCase() !== 'summary') return;
+                if (e.key === ' ' || e.key === 'Spacebar') e.preventDefault();
+                const details = el.parentElement;
+                if (details.hasAttribute('open')) details.removeAttribute('open');
+                else details.setAttribute('open', '');
+            });
+
+            // Optional: open first match on Enter when focus is on search
+            searchEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const first = listEl.querySelector('.faq__item:not(.faq__hidden)');
+                    if (first) {
+                        first.setAttribute('open', '');
+                        const summary = first.querySelector('summary');
+                        if (summary) summary.focus();
+                    }
+                }
+            });
+
+            // Initialize (no filter)
+            filter('');
+        })();
+    </script>
+    <section class="faq" aria-label="FBP Frequently Asked Questions">
+        <h2 class="faq__title">Frequently Asked Questions</h2>
+
+        <label class="faq__search-label" for="faq-search">Search FAQs</label>
+        <input id="faq-search" class="faq__search" type="search" placeholder="Search questions and answers"
+            aria-controls="faq-list" />
+
+        <div id="faq-list" class="faq__grid">
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">Is My Personal Information Secure?</summary>
+                <div class="faq__answer">
+                    <p>Your personal information is secure with FBP.
+                        We implement strict security measures to protect your data.
+                        Your personal data is never visible to other FBP users.
+                        All data stored by FBP is encrypted at rest and in transit,
+                        and we follow best practices for data security.
+                        For more details, please refer to our <a href="https://my-fbp.com/privacy.html"><b>Privacy
+                                Policy</b></a>.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">Is My Personal Information Private?</summary>
+                <div class="faq__answer">
+                    <p>All of your personal information is private.
+                        Your email address is used by FBP to send you any emails that you have opted into.
+                        Your mobile number is used by FBP to send you any text messages that you have opted into.
+                        All emails and text messages are sent individually to you and
+                        your personal information is never shared with other FBP users.
+                        The only public information about you is your Screen Name.
+                        All user data is encrypted at rest and in transit,
+                        and we follow best practices for data security.
+                        For more details, please refer to our <a href="https://my-fbp.com/privacy.html"><b>Privacy
+                                Policy</b></a>.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">ChatBot Tip</summary>
+                <div class="faq__answer">
+                    <p>FBP does have a chatbot feature that can only answer questions related to FBP.
+                        You can ask it questions about FBP, and it will provide you with relevant information.
+                        For example, you ask it about a specific NFL team, and it will provide you with information
+                        about that teams' record as the Favorite and as the Underdog. You can just type in "Bills"
+                        and you'll get the rundown on the Bills record to date.
+                        You can ask questions about the FBP Pool, and it will provide you with relevant information.
+                        For example, you can ask about your own performance in the pool. Just put in your Display Name,
+                        email address
+                        or Last Name and you'll get your record to date. You can also ask about other players in the
+                        pool,
+                        and it will provide you with relevant information. To look up another player's stats, you can
+                        put in either the
+                        full Display Name or a portion of it.
+                        NOTE: Absolutely no personal information other than your Screen Name
+                        will be contained in a chatbot response.
+                        If you ask a relevant question and don't get a satisfactory response, please reach out to FBP
+                        Admin for assistance.
+
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">How Do I Make Payment for the FBP Pool?</summary>
+                <div class="faq__answer">
+                    <p>You can contact FBP Admin by email at <a
+                            href="mailto:fbpadmin@my-fbp.com"><b>fbpadmin@my-fbp.com</b></a>.
+                        We will do our best to respond to your inquiry as quickly as possible.
+                        Payment can be made via Venmo or PayPal. Please visit our <a
+                            href="https://my-fbp.com/makepayment.html"><b>FBP Payment Page</b></a>.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">How Do I Contact FBP If I Have Questions?</summary>
+                <div class="faq__answer">
+                    <p>You can contact FBP Admin by email at <a
+                            href="mailto:fbpadmin@my-fbp.com"><b>fbpadmin@my-fbp.com</b></a>.
+                        We will do our best to respond to your inquiry as quickly as possible.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">Can I change my email address?</summary>
+                <div class="faq__answer">
+                    <p>
+                        That is a bit of a problem. Your email address is used internally by FBP to keep track of your
+                        overall account data: wins, losses, picks, etc. At this point, the only thing we can say is that
+                        we will need to look into the issue further to determine if it is possible to change your
+                        email address without losing your account data.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">I Forgot My Password. What Should I Do?</summary>
+                <div class="faq__answer">
+                    <p>Don't panic! You can reset your password by clicking the "Forgot Your Password" link on the login
+                        page.
+                        Follow the instructions to reset your password and regain access to your account.
+                        An email will be sent to the email address that is associated with your
+                        account with instructions on how to reset your password.
+                        If you don't receive the email within a few minutes, please check your spam or junk folder.
+                        If you still have trouble resetting your password, please contact FBP Admin
+                        at <a href="mailto:fbpadmin@my-fbp.com"><b>fbpadmin@my-fbp.com</b></a>.
+                    </p>
+                    <p> Please note that your login id and password are managed and stored in an Amazon
+                        Web Service in the cloud. FBP does not have access to your password and cannot
+                        reset it for you. You must use the "Forgot Your Password" link to reset your password.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">How Do I Set My FBP Profile?</summary>
+                <div class="faq__answer">
+                    <p>The "Update My Profile" link is on every page in the FBP website.
+                        Click that link and you'll see a form where you can set your First and Last Names,
+                        your Display Name, and your options to receive emails and/or text messages
+                        for Reminders and Grid Sheet
+                        availablity. You also set a default algorithm that will be used to make your picks
+                        if you don't make picks on any given week. You also can set a default Monday Night
+                        Tiebreaker value that will be used if you don't set a tiebreaker value for any given week.
+                        Your email address is never shown to other users, but it is used by FBP Admin to
+                        send you your weekly grid sheet and reminders if you have those options enabled.
+                        Don't forget to click the "Update Profile" button at the bottom of the page to save
+                        your profile information.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">How Do I Set My Email and Text Messaging Preferences?
+                </summary>
+                <div class="faq__answer">
+                    <p>The "Update My Profile" link is on every page in the FBP website.
+                        Click the "Update My Profile" link and you'll see a form where
+                        you can set your email and text messaging preferences for
+                        Reminders, Pick Sheet and Grid Sheet availability.</p>
+                    <p>To sign up for text messaging:</p>
+                    <ul>
+                        <li>Enter your mobile phone number in the appropriate field.</li>
+                        <li>Click on "Verify" to receive a verification code via text message.</li>
+                        <li>Enter the verification code in the provided field.</li>
+                        <li>Check the boxes for the types of messages you want to receive.</li>
+                        <li>Click the "Update Profile" button at the bottom of the page to save your preferences.</li>
+                    </ul>
+                    <p>To sign up for email notifications:</p>
+                    <ul>
+                        <li>Check the boxes for the types of emails you want to receive.</li>
+                        <li>Click the "Update Profile" button at the bottom of the page to save your preferences.</li>
+                    </ul>
+                    <p>To opt out of email notifications:</p>
+                    <ul>
+                        <li>Go to the "Update My Profile" page.</li>
+                        <li>Uncheck the boxes for the types of emails you no longer want to receive.</li>
+                        <li>Click the "Update Profile" button at the bottom of the page to save your preferences.</li>
+                    </ul>
+                    <p>To opt out of Text Messaging:</p>
+                    <ul>
+                        <li>Uncheck the boxes for the types of messages you no longer want to receive.</li>
+                        <li>Click the "Update Profile" button at the bottom of the page to save your preferences.</li>
+                    </ul>
+                    You may also opt out of text mesaging by replying "STOP" to any text message you receive. This will
+                    unsubscribe you to that particular text message. To completely unsubscribe from text messaging,
+                    reply "STOP ALL" and you will be unsubscribed completely from all text messages. You may opt in
+                    again by clicking the "Update My Profile" link that appears on every page. You will not have to
+                    verify your mobile phone number again.
+                    You may change your mobile phone number at any time by entering a new mobile phone number in the
+                    "Update My Profile" page. You will need to verify this new number.
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">How do I make my picks for the week?</summary>
+                <div class="faq__answer">
+                    <p>The "Make My Picks For The Week" link is on every page in the FBP website.
+                        Click that link and you'll see a table where you can make your picks for each game.
+                        You can click the radio button or on the Team Helmet to make your pick.
+                        Don't forget to enter a Monday Night Tiebreaker value as well. If you do not enter a value,
+                        your default Monday Night Tiebreaker value will be used.
+                        If you have not set a default Monday Night Tiebreaker value,
+                        a random value will be generated between 21 and 63.
+                        Once you have made your picks, click the "Submit My Picks" button at
+                        the bottom of the page to save your picks for the week.
+                    </p>
+                </div>
+            </details>
+
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">What Other Options Are There for Picks?</summary>
+                <div class="faq__answer">
+                    <p>At the bottom of the pick sheet table, there are buttons that allow your to
+                        pick All Away Teams, All Home Teams, All Favorites, All Underdogs or Random.
+                        Try them for yourself and see what they do.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">Can I Leave Some Picks Blank?</summary>
+                <div class="faq__answer">
+                    <p>Yes. You can make as many or as few picks as you want. If you don't make a pick
+                        for a game, your default algorithm will be used to make your pick for that game.
+                        You can set your default algorithm in your profile settings.
+                        You can also leave the Monday Night Tiebreaker blank and your default
+                        Monday Night Tiebreaker value will be used for that. If you have not set a default
+                        Monday Night Tiebreaker value, a random value will be generated between 21 and 63.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">When Am I Able To Make My Picks?</summary>
+                <div class="faq__answer">
+                    <p>FBP is open for picks from Tuesday Noon EST until 8:00 PM EST on Thursday of each week.
+                        Once the pool is closed on Thursday at 8:00 PM EST, you will no longer be able to
+                        make or change your picks for that week.
+                        You can see the current status of the pool on the home page of the FBP website.
+                        If you have any questions about when the pool is open or closed, please contact
+                        FBP Admin at <a href="mailto:fbpadmin@my-fbp.com"><b>fbpadmin@my-fbp.com</b></a>.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">What Is A Spread?</summary>
+                <div class="faq__answer">
+                    <p>The spread is the point difference set by oddsmakers to even the playing field
+                        between two teams. For example, if Team A is favored to win by 7.5 points over Team B,
+                        the spread would be -7.5 for Team A and +7.5 for Team B. The winner with the spread is
+                        determined by adding the spread to the final score of the game.
+                        If you pick Team A, they would need to win by more than 7.5 points for
+                        you to win with your pick. If you pick Team B, they would need to lose by
+                        less than 7.5 points or win the game outright for you to win with your pick.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">What is the Monday Night Tiebreaker?</summary>
+                <div class="faq__answer">
+                    <p>The Monday Night Tiebreaker is the total number of points scored in the
+                        Monday Night Football game each week.
+                        You can enter your tiebreaker value on the pick sheet when you make your picks for the week.
+                        If you don't enter a tiebreaker value, your default tiebreaker value from your
+                        profile will be used. If you have not set a default Monday Night Tiebreaker value,
+                        a random value will be generated between 21 and 63.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">What if there is a tie?</summary>
+                <div class="faq__answer">
+                    <p>In the event of a tie in the number of correct picks for the week, the Monday Night Tiebreaker
+                        will be used to determine the winner.
+                        The player with the closest tiebreaker value to the actual total points scored in
+                        the Monday Night Football game will be declared the winner for the week.
+                        If there is still a tie after using the tiebreaker, then the tied players
+                        will share the win for that week. Each player will get 1/2 of the winnings for that week.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">Do You Change The Spreads During the Week?</summary>
+                <div class="faq__answer">
+                    <p>Absolutely not. The spreads are set on Tuesday when the schedule is released
+                        and they do not change for the rest of the week. You can make your picks
+                        based on the spreads that are set on Tuesday and you don't have to
+                        worry about them changing on you later in the week.
+                    </p>
+                    <p>Changing the spreads during the week would be unfair to players who made their
+                        picks based on the original spreads.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">What is the gridsheet?</summary>
+                <div class="faq__answer">
+                    <p>The gridsheet is available for viewing AFTER the pool is re-opened on Tuesday.
+                        Might sound confusing, but making the gridsheet available when the pool is open for
+                        picks could give another player an unfair advantage. So, wait until Tuesday to check
+                        the gridsheet. If you try to view it before Tuesday, you'll see a message telling you
+                        that the gridsheet will be available when the pool is re-opened on Tuesday.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">How can I see the weekly results?</summary>
+                <div class="faq__answer">
+                    <p>After the pool re-opens on Tuesday, you can view the weekly results by clicking on
+                        the "Show Results For the Previous Week" link on any page of the FBP website.
+                        If you try to view the weekly results before Tuesday, you'll see a
+                        message telling you that the results will be available after the pool re-opens on Tuesday.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">I forgot to make my picks. Can you re-open the pool for me?
+                </summary>
+                <div class="faq__answer">
+                    <p>No — once the pool is closed, it cannot be re-opened for individual players.
+                        You must make your picks before the pool closes each week.
+                        Your picks will be made for you based on your default algorithm if you don't make them before
+                        the pool closes.
+                        You can modify your profile to receive email reminders to make your picks.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">Do I need to sign out?</summary>
+                <div class="faq__answer">
+                    <p>That's up to you. If you're on a shared computer, it's a good idea to sign out when you're done.
+                        You can sign out by clicking the "Sign Out" link at the top right of any page in the FBP
+                        website.
+                        If you're on a personal device that only you have access to,
+                        you can stay signed in for convenience. If you wait a week or so to come back to the FBP
+                        site, you may get redirected to the login page and asked to sign in again.
+                        This is a security measure to protect your account.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">Can I invite my friends to FBP?</summary>
+                <div class="faq__answer">
+                    <p>Traditionally, FBP has been a private pool for a specific group of friends and family.
+                        However, we are open to new players joining the fun. If you have friends who are interested in
+                        joining FBP,
+                        please have them contact FBP Admin at <a
+                            href="mailto:fbpadmin@my-fbp.com"><b>fbpadmin@my-fbp.com</b></a>.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">What do you get if you are the winner for the week?
+                </summary>
+                <div class="faq__answer">
+                    <p>The exact amount of the winnings are still TBD.
+                    </p>
+                    <p>
+                        At the end of the season, at least two additional prizes will be awarded:
+                    <ul>
+                        <li>A prize will be awarded to the player with the most correct picks who did
+                            not have an overall win for the week.
+                        </li>
+                        <li>A prize will also be awarded to the player who finishes with the most incorrect picks.</li>
+                    </ul>
+                    </p>
+
+                </div>
+            </details>
+        </div>
+    </section>
+    <div id="chat-widget">
+        <button id="chat-toggle" onclick="document.getElementById('chat-widget').classList.toggle('open')"
+            aria-label="Toggle chat">
+            💬 FBP Assistant
+        </button>
+        <div id="chat-body">
+            <div id="chat-messages"></div>
+            <div id="chat-input-row">
+                <input type="text" id="chat-input" placeholder="Ask me about FBP..." autocomplete="off">
+                <button id="chat-send" onclick="window.sendChatBotMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+    <script type="module">
+        import { sendChatBotMessage } from "/js-lib/chatbot.js";
+        window.sendChatBotMessage = sendChatBotMessage;
+    </script>
+
+</body>
+
+</html>

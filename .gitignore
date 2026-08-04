@@ -1,0 +1,109 @@
+# AWS SAM / Serverless project .gitignore
+# Tailor this file to your runtime (Java / Node / Python / etc.) and CI/CD setup.
+#
+# Don't commit twilio-layer.
+twilio-layer/
+# -----------------------
+# SAM build & packaging
+# -----------------------
+twilio-layer/
+.aws-sam/                    # SAM build output
+packaged.yaml                # SAM packaged template
+packaged.yml
+.template.yaml.packaged      # sometimes produced
+# samconfig.toml             # optional: uncomment if you don't want to commit deploy config
+
+# Local dev / SAM CLI
+.localstack/                 # localstack (if used)
+.env                         # environment files (may contain secrets)
+.env.*                       # other env files (e.g. .env.local)
+.sam/                        # some tools may create this
+
+# node js
+node_modules/
+
+# -----------------------
+# Java / Maven / Gradle
+# -----------------------
+target/
+*.class
+*.jar
+*.war
+*.ear
+.build/
+.gradle/
+.build/
+!gradle/wrapper/gradle-wrapper.jar  # if you want to keep the wrapper jar, remove the leading "!" line
+
+# Maven wrapper files are usually committed; DO NOT ignore the .mvn directory or wrapper scripts
+# (adjust if you intentionally don't check them in).
+
+# -----------------------
+# Node.js
+# -----------------------
+node_modules/
+npm-debug.log*
+yarn-error.log
+dist/
+build/
+
+# -----------------------
+# Python
+# -----------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-wheel-metadata/
+__pypackages__/
+.pytest_cache/
+
+# -----------------------
+# Serverless framework
+# -----------------------
+.serverless/
+
+# -----------------------
+# IDE / Editor files
+# -----------------------
+.vscode/*
+!.vscode/launch.json
+.idea/
+*.iml
+*.ipr
+*.iws
+*.sublime-workspace
+*.sublime-project
+
+# -----------------------
+# OS files
+# -----------------------
+.DS_Store
+Thumbs.db
+
+# -----------------------
+# Misc / archives / logs
+# -----------------------
+*.log
+*.tmp
+*.swp
+*.zip
+*.tar.gz
+*.rar
+
+# -----------------------
+# Security: avoid committing credentials / secrets
+# -----------------------
+# Never commit AWS credentials:
+# ~/.aws/credentials should live outside the repo; add local variants if you store any in the project
+# If you have any credential or secret files inside the repo for local dev, add them here:
+# secrets.json
+
+# amplify
+.amplify
+amplify_outputs*
+amplifyconfiguration*

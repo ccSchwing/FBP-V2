@@ -1,0 +1,25 @@
+{
+  "version": "2.0",
+  "routeKey": "POST /getSMSVerificationCode",
+  "rawPath": "/getSMSVerificationCode",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": "{\"email\": \"chuckschwing@proton.me\"}",
+  
+  "requestContext": {
+    "routeKey": "POST /getSMSVerificationCode",
+    "stage": "$default",
+    "requestId": "local-request-id",
+    "apiId": "local",
+    "http": {
+      "method": "POST",
+      "routeKey": "POST /getSMSVerificationCode",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    }
+  },
+  "isBase64Encoded": false
+}

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FBP Admin Dashboard</title>
+    <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+    <script src="/js-lib/oidc-client-ts.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.min.css">
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.3/js/jquery.tablesorter.min.js"></script>
+    <style>
+        /* Override header h1 positioning to not cover menu button */
+        header h1 {
+            position: static;
+            transform: none;
+            left: auto;
+        }
+
+        #logsOutput table th,
+        #logsOutput table td {
+            border: 1px solid black;
+        }
+
+        #logsOutput table {
+            width: auto;
+            border: 2px solid black;
+            padding: 5px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            background-origin: padding-box;
+            border-collapse: collapse;
+            border-color: black;
+        }
+
+        #logsOutput table th {
+            background-color: #4caf50;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .page-title {
+            position: static;
+            transform: none;
+            left: auto;
+            width: 100vw;
+            max-width: 100%;
+            text-align: center;
+            margin-top: 2rem;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+
+    <script type="module">
+        import { auth } from "/js/auth.js";
+        await auth.ensureAuthenticated();
+        const isAdmin = await auth.isAdmin();
+        if (!isAdmin) {
+            location.href = await getServiceUrl("homePage");
+        } else {
+            console.log("User is Admin");
+        }
+    </script>
+    <script type="module">
+        import { getServiceUrl } from "/js-lib/urlConfig.js";
+        async function queryFBPLogs(startDate, endDate, week, logLevel) {
+            try {
+                const URL_KEY = "queryFBPLogs";
+                const lambdaURL = await getServiceUrl(URL_KEY);
+                // Pass all form params and have the lambda figure out what
+                // to do.
+                const payload = { logLevel };
+                if (week && week.trim() !== "") {
+                    payload.week = week.trim();
+                } else {
+                    payload.startDate = startDate;
+                    payload.endDate = endDate;
+                }
+                const response = await fetch(lambdaURL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json();
+                console.log("Query Logs Response:", data);
+                window.data = data; // Make data globally accessible for debugging
+
+                if (response.ok) {
+                } else {
+                    alert("Failed to query logs. Check console for details.");
+                }
+            } catch (error) {
+                console.error("Error querying FBP logs:", error);
+                const logsOutput = document.getElementById('logsOutput');
+                if (logsOutput) {
+                    logsOutput.textContent = `Error: ${error.message}`;
+                }
+            }
+            displayLogsInTable(window.data);
+        }
+        window.queryFBPLogs = queryFBPLogs;
+    </script>
+    <script>
+        function displayLogsInTable(data) {
+            const logData = data;
+            if (!logData) {
+                alert("No log data available to display.");
+                return;
+            }
+
+            // Clear existing content
+            const logsOutput = document.getElementById('logsOutput');
+            logsOutput.innerHTML = '';
+
+            // Create table
+            const table = document.createElement("table");
+            table.id = "logsTable";
+            table.className = "tablesorter";
+            table.style.marginLeft = "20px";
+            const thead = document.createElement('thead');
+            const tbody = document.createElement('tbody');
+
+            // Define table headers based on log properties
+            const headers = ['timestamp', 'week', 'level', 'email', 'action', 'details'];
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // Populate table rows with log data
+            logData.forEach(log => {
+                const row = document.createElement('tr');
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.textContent = log[header] || '';
+                    row.appendChild(td);
+                });
+                if (log.level === 'ERROR') {
+                    row.style.backgroundColor = '#f8d7da'; // Light red background for error logs
+                }
+                if (log.level === 'WARNING') {
+                    row.style.backgroundColor = '#fff3cd'; // Light yellow background for warning logs
+                }
+                tbody.appendChild(row);
+            });
+            table.appendChild(tbody);
+            logsOutput.appendChild(table);
+
+            // Enable click-to-sort behavior on each column header.
+            if ($.fn.tablesorter) {
+                $("#logsTable").tablesorter();
+            }
+        }        
+    </script>
+    <script type="module">
+        import { getCurrentWeek } from "/js-lib/fbpUtils.js";
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                const currentWeek = await getCurrentWeek();
+                document.getElementById("current-week").textContent = currentWeek;
+                console.log("Current week data:", currentWeek);
+            } catch (error) {
+                console.error("Error fetching current week data:", error);
+                alert("Failed to load current week data. Please try again later.");
+            }
+        });
+    </script>
+</head>
+
+<body class="fbp-admin">
+    <header>
+        <h1 style="text-align: center;">FBP Admin Log Viewer</h1>
+    </header>
+    <div class="container" style="display:flex; gap:2rem; align-items:flex-start; margin:0; max-width:100%;">
+        <script type="module">
+            import { initAdminNav } from "/js-lib/adminNav.js";
+            await initAdminNav();
+        </script>
+        <aside class="nav-choices">
+            <!-- populated by adminNav.js -->
+        </aside>
+        <main class="results-main">
+            <div class="callout">Current Week: <span id="current-week"></span></div>
+            <script>
+                $(function () {
+                    $("#startDate").datepicker({
+                        dateFormat: "mm-dd-yy 00:00:00"
+                    });
+                    $("#endDate").datepicker({
+                        dateFormat: "mm-dd-yy 23:59:59"
+                    });
+                    $('#startDate, #endDate').on('change', function () {
+                        const startDate = $('#startDate').val();
+                        const endDate = $('#endDate').val();
+                        console.log("Selected Start Date:", startDate);
+                        console.log("Selected End Date:", endDate);
+                        $('#week').val(''); // Clear the week input when startDate or endDate changes
+                    });
+                    $('#week').on('change', function () {
+                        const week = $('#week').val();
+                        console.log("Selected Week:", week);
+                        // Set starDate and endDate to empty strings.
+                        $('#startDate').val('');
+                        $('#endDate').val('');
+                    });
+                    // $('#startDate, #endDate').on('change', function () {
+                    //     const startDate = $('#startDate').val();
+                    //     const endDate = $('#endDate').val();
+                    //     console.log("Selected Start Date:", startDate);
+                    //     console.log("Selected End Date:", endDate);
+                    // });
+                    $('input[name="logLevel"]').on('change', function () {
+                        const logLevel = $(this).val();
+                        console.log("Selected Log Level:", logLevel);
+                    });
+                    $('#adminForm').on('submit', function (e) {
+                        e.preventDefault();
+                        const startDate = $('#startDate').val();
+                        const endDate = $('#endDate').val();
+                        // const logLevel = $('#logLevel').val();
+                        const logLevel = $('input[name="logLevel"]:checked').val();
+                        console.log("Selected Start Date:", startDate);
+                        console.log("Selected End Date:", endDate);
+                        console.log("Selected Log Level:", logLevel);
+                        const week = $('#week').val();
+                        queryFBPLogs(startDate, endDate, week, logLevel);
+                    });
+                });
+            </script>
+            <form id="adminForm" style="margin-left: 20px;">
+                <label for="startDate">Select StartDate:</label>
+                <input type="text" id="startDate" name="startDate" />
+                <label for="endDate">Select End Date:</label>
+                <input type="text" id="endDate" name="endDate" />
+                <label for="week">Select Week:</label>
+                <input type="text" id="week" name="week" /><br>
+                <label class="custom-radio">
+                    <input type="radio" id="info" name="logLevel" value="INFO">
+                    <span class="checkmark"></span>
+                    INFO
+                </label><br>
+                <label class="custom-radio">
+                    <input type="radio" id="warn" name="logLevel" value="WARN">
+                    <span class="checkmark"></span>
+                    WARN
+                </label><br>
+                <label class="custom-radio">
+                    <input type="radio" id="error" name="logLevel" value="ERROR">
+                    <span class="checkmark"></span>
+                    ERROR
+                </label><br>
+                <label class="custom-radio">
+                    <input type="radio" id="all" name="logLevel" value="ALL" checked>
+                    <span class="checkmark"></span>
+                    ALL
+                </label><br>
+                <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Submit</button>
+            </form>
+        </main>
+    </div>
+    <div id="logsResult">
+        <pre id="logsOutput" style="margin-left: 20px;">No logs loaded yet. Submit the form to query logs.</pre>
+    </div>
+</body>
+
+</html>

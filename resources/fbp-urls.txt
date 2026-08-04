@@ -1,0 +1,38 @@
+# URL config format: key:https://endpoint
+# Keys are case-sensitive and used by js-lib/urlConfig.js getServiceUrl(key)
+#
+# This section begins the use of the python lambdas.
+# once tested, you can adjust the original entries above
+# to use the python lambda functions.
+# Note the new stackname
+getFBPUserPython:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getFBPUserPython
+updateFBPUserPython:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/updateFBPUser
+addFBPUserPython:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/addFBPUser
+getAllFBPPicksPython:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getAllFBPPicks
+getPoolStatus:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getPoolOpen
+setPoolStatusOpen:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/setPoolStatusOpen
+setPoolStatusClosed:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/setPoolStatusClosed
+getPickSheet:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getPickSheet
+getFBPPicksForUserPython:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getFBPPicksPython
+savePicks:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/saveFBPPicks
+getWeeklyResults:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getWeeklyResults
+calcWeeklyResults:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/calcWeeklyResults
+updateWeeklyResults:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/updateWeeklyResults
+getFBPUserEmailAndDisplayName:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getFBPUserEmailAndDisplayName
+getStandings:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getStandings
+sendEmail:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/sendEmail
+validateAndFixFBPPicks:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/validateAndFixFBPPicks
+queryFBPLogs:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/queryFBPLogs
+getSchedule:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getschedule
+getUserStatus:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getUserStatus
+FBPLedger:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getFBPLedger
+FBPLedgerDeposit:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/deposit
+FBPLedgerPayout:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/payout
+storeSMSVerificationCode:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/storeSMSVerificationCode
+getSMSVerificationCode:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getSMSVerificationCode
+updateSMSVerification:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/updateSMSVerification
+advancedEmail:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/advanced-email
+getTeamRecords:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getTeamRecords
+chatbot:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/chatbot
+getCurrentWeek:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getCurrentWeek
+htmlToPdf:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/htmlToPdf

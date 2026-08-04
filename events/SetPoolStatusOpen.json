@@ -1,0 +1,23 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /setPoolStatusOpen",
+  "rawPath": "/setPoolStatusOpen",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "requestContext": {
+    "routeKey": "GET /setPoolStatusOpen",
+    "stage": "$default",
+    "requestId": "local-request-id",
+    "apiId": "local",
+    "http": {
+      "method": "GET",
+      "path": "/setPoolStatusOpen",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    }
+  },
+  "isBase64Encoded": false
+}

@@ -1,0 +1,24 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /closePool",
+  "rawPath": "/closePool",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "requestContext": {
+    "accountId": "123456789012",
+    "apiId": "local",
+    "requestId": "local-request-id",
+    "http": {
+      "method": "GET",
+      "path": "/closePool",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    },
+    "routeKey": "GET /closePool",
+    "stage": "$default"
+  },
+  "isBase64Encoded": false
+}

@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: fbplib
+Version: 0.1.0
+Summary: FBP Python utility library
+Author-email: Your Name <your@email.com>
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+Requires-Dist: boto3
+Requires-Dist: aws-lambda-powertools
+Requires-Dist: pytz

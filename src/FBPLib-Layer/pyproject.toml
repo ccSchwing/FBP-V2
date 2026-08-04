@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fbplib"
+version = "0.1.0"
+description = "FBP Python utility library"
+authors = [
+    { name = "Your Name", email = "your@email.com" }
+]
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "boto3",
+    "aws-lambda-powertools",
+    "pytz"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fbplib*"]

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Silent Refresh</title>
+  <script src="/js-lib/oidc-client-ts.min.js"></script>
+  <script type="module">
+    import { oidcConfig, getRedirectUri, getPostLogoutRedirectUri } from '/js/oidcConfig.js';
+
+    const authConfig = {
+      authority: oidcConfig.authority,
+      client_id: oidcConfig.clientId,
+      redirect_uri: getRedirectUri(),
+      silent_redirect_uri: `${window.location.origin}/silent.html`,
+      post_logout_redirect_uri: getPostLogoutRedirectUri(),
+      response_type: oidcConfig.responseType,
+      scope: oidcConfig.scope,
+    };
+
+    new oidc.UserManager(authConfig).signinSilentCallback().catch((err) => {
+      console.error("Silent refresh failed:", err);
+    });
+  </script>
+</head>
+<body>
+  <!-- Silent refresh in progress -->
+</body>
+</html>

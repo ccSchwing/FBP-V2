@@ -1,0 +1,22 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /getPoolConfig",
+  "rawPath": "/getPoolConfig",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "requestContext": {
+    "http": {
+      "method": "GET",
+      "path": "/getPoolConfig",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    },
+    "routeKey": "GET /getPoolConfig",
+    "stage": "$default"
+  },
+  "isBase64Encoded": false
+}
+

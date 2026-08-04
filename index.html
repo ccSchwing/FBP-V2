@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FBP Home</title>
+  <script src="/js-lib/oidc-client-ts.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+  <script type="module">
+    (async () => {
+      const { auth } = await import("/js/auth.js");
+      await auth.ensureAuthenticated();
+    })().catch(console.error);
+</script>
+  <style>
+    #statusBanner {
+      display: block;
+      margin: 8px auto 12px;
+      padding: 8px 10px;
+      border: 1px solid #0c5b63;
+      background: #fff9db;
+      color: #210c78;
+      font-size: 0.92rem;
+      width: fit-content;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body class="fbp-home">
+  <header>
+    <h1>Welcome to FBP Hope You Don't Break it!!</h1>
+  </header>
+  <div id="statusBanner" aria-live="polite" style="text-align: center;"></div>
+  <div class="container" style="display:flex; gap:2rem; align-items:flex-start; margin:0; max-width:100%;">
+    <script type="module">
+      import { initNav } from "/js-lib/nav.js";
+      import { setBannerStatusMessage } from "/js-lib/bannerUtils.js";
+      await initNav();
+      await setBannerStatusMessage();
+    </script>
+    <aside class="nav-choices">
+      <!-- populated by nav.js -->
+    </aside>
+  </div>
+  <footer>
+    <p>
+      Questions? Contact us at <a href="mailto:fbpadmin@my-fbp.com">fbpadmin@my-fbp.com</a>
+    </p>
+    <p>&copy; 2026 FBP. All rights reserved.</p>
+  </footer>
+</body>
+
+</html>

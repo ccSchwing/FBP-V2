@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="/js-lib/oidc-client-ts.min.js"></script>
+    <title>Logout Page</title>
+</head>
+
+<body>
+    <h1>Logout Page</h1>
+    <p>Processing logout...</p>
+    <script type="module">
+        import { auth } from "/js/auth.js";
+        await auth.logout();
+    </script>
+    <footer>
+        <p>
+            Questions? Contact us at <a href="mailto:fbpadmin@my-fbp.com">fbpadmin@my-fbp.com</a>
+        </p>
+        <p>&copy; 2026 FBP. All rights reserved.</p>
+    </footer>
+</body>
+</html>

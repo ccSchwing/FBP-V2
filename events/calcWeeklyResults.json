@@ -1,0 +1,21 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /calcWeeklyResults",
+  "rawPath": "/calcWeeklyResults",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "requestContext": {
+    "http": {
+      "method": "GET",
+      "path": "/calcWeeklyResults",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    },
+    "routeKey": "GET /calcWeeklyResults",
+    "stage": "$default"
+  },
+  "isBase64Encoded": false
+}

@@ -1,0 +1,132 @@
+{
+    "Records": [
+        {
+            "eventSource": "aws:ses",
+            "eventVersion": "1.0",
+            "ses": {
+                "mail": {
+                    "timestamp": "2026-04-28T02:30:36.738Z",
+                    "source": "chuckschwing@proton.me",
+                    "messageId": "h1bea9i47181ihesf7l0kh4ds40a3vuobvc4kt01",
+                    "destination": [
+                        "fbpadmin@my-fbp.com"
+                    ],
+                    "headersTruncated": false,
+                    "headers": [
+                        {
+                            "name": "Return-Path",
+                            "value": "<chuckschwing@proton.me>"
+                        },
+                        {
+                            "name": "Received",
+                            "value": "from mail-244116.protonmail.ch (mail-244116.protonmail.ch [109.224.244.116]) by inbound-smtp.us-east-1.amazonaws.com with SMTP id h1bea9i47181ihesf7l0kh4ds40a3vuobvc4kt01 for fbpadmin@my-fbp.com; Tue, 28 Apr 2026 02:30:36 +0000 (UTC)"
+                        },
+                        {
+                            "name": "X-SES-Spam-Verdict",
+                            "value": "PASS"
+                        },
+                        {
+                            "name": "X-SES-Virus-Verdict",
+                            "value": "PASS"
+                        },
+                        {
+                            "name": "Received-SPF",
+                            "value": "pass (spfCheck: domain of proton.me designates 109.224.244.116 as permitted sender) client-ip=109.224.244.116; envelope-from=chuckschwing@proton.me; helo=mail-244116.protonmail.ch;"
+                        },
+                        {
+                            "name": "Authentication-Results",
+                            "value": "amazonses.com; spf=pass (spfCheck: domain of proton.me designates 109.224.244.116 as permitted sender) client-ip=109.224.244.116; envelope-from=chuckschwing@proton.me; helo=mail-244116.protonmail.ch; dkim=pass header.i=@proton.me; dmarc=pass header.from=proton.me;"
+                        },
+                        {
+                            "name": "X-SES-RECEIPT",
+                            "value": "AEFBQUFBQUFBQUFIT0E4RXcwalBFOHhYWEhYcmRLMXMrbkFHQW0yT1hadjVUWlkySTQ3S29YbzdEaEQ1bWNsVDIvK2dwUjJJdmpGSWJEbUtMVmJpRVlDelFWbXh6ejF4cXlTTFR3ZXNGTWQ1TjNaV1ppZnJNcVc1Qnh5dUgybldXNEQrUDhaTDFvZFBlVitHR2QvNDhDOTFHaDV6OVpaUkV1RjdTMEpJb0drSk9ONnNNWDB2d0JXY3VUN015bzArNU1XOE5jTHdUamFmVHhDU0dRdnRzbTlFYnVXSHJKNWVGWnR3bUlBZnhKQzN3QjNqM2ZUaWs3NGpoWDR1Wk5GSGNzc29LSlhPanAzKyt5aFJCSitTWkNIWUVtUEFEeXRpQmJzSXRCQWVVdENKT1IrUnpQWVJ5Z0E9PQ=="
+                        },
+                        {
+                            "name": "X-SES-DKIM-SIGNATURE",
+                            "value": "a=rsa-sha256; q=dns/txt; b=KxEj7zolcOCkGlYvLI3RrI6dzMRsHnG7FSes6HdqTa2e3U0pKuuuy2WMrY2J9KPfbOGG3eO7gSL+l7i6V8mQHROmcrqkFclJKwhFCaO4cq79q+7UuAl1oEiSGgsmcXjoK67RRuvhStFXlbpuaXYvj2BdWOppNM3Wh9VcphIKk/E=; c=relaxed/simple; s=224i4yxa5dv7c2xz3womw6peuasteono; d=amazonses.com; t=1777343438; v=1; bh=vOI/f+Xyn2+6onZAwB9EMFJIBUunXQqbxk3mfip88VU=; h=From:To:Cc:Bcc:Subject:Date:Message-ID:MIME-Version:Content-Type:X-SES-RECEIPT;"
+                        },
+                        {
+                            "name": "DKIM-Signature",
+                            "value": "v=1; a=rsa-sha256; c=relaxed/relaxed; d=proton.me; s=protonmail; t=1777343435; x=1777602635; bh=vOI/f+Xyn2+6onZAwB9EMFJIBUunXQqbxk3mfip88VU=; h=Date:To:From:Subject:Message-ID:Feedback-ID:From:To:Cc:Date:Subject:Reply-To:Feedback-ID:Message-ID:BIMI-Selector; b=nXv5wr51KLErNYcNkqjuVzohvpYGgcbiJ3RzHHTzUosLeUWtbKtXzfQj5kDfqacDebzJ1afuvO4lJ1E2Q43i26aa6GYwFYqIdKOVr0ku+mmeLxOrIKpKv+eGuyEAtD5qxA636q3RJItmqVWApTd/4hdBUyeeGCg9JEyc5s4+wZkMBqVkN6m7ns1q2uFQ+L1tphMz3hwPJuYTH+Dhev+2l2Cb2wlSkDBvxC9gtn692qMkdVKvNLgYSGz2XSzpynX+uDM60+rPLw+A9lCNeyTjU3lIAQAai7UglXDGYe4bPLSoHs4sN2w0V+oe2uYSAT5pyLVazh7d9jXnho+9UTERqw=="
+                        },
+                        {
+                            "name": "Date",
+                            "value": "Tue, 28 Apr 2026 02:30:30 +0000"
+                        },
+                        {
+                            "name": "To",
+                            "value": "fbpadmin <fbpadmin@my-fbp.com>"
+                        },
+                        {
+                            "name": "From",
+                            "value": "Chuck Schwing <chuckschwing@proton.me>"
+                        },
+                        {
+                            "name": "Subject",
+                            "value": "Number 11"
+                        },
+                        {
+                            "name": "Message-ID",
+                            "value": "<C435wiCgxLs9-4ETTvOt7dBrszS_OHwVaVv2bAFl4IfyfOeta2tMZJs1VQ86NUAbhNOxBM6jepUhoYvDlGBxVwbs3fbrDbPYV4uHOY_LaRw=@proton.me>"
+                        },
+                        {
+                            "name": "Feedback-ID",
+                            "value": "58032331:user:proton"
+                        },
+                        {
+                            "name": "X-Pm-Message-ID",
+                            "value": "ba22dd41ca233cef078ddb6dfe3280b343629060"
+                        },
+                        {
+                            "name": "MIME-Version",
+                            "value": "1.0"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "multipart/alternative; boundary=\"b1=_Ew534utMEl8rIXQAubvXzw1WCVhLqyaxgGOO1GEOo\""
+                        }
+                    ],
+                    "commonHeaders": {
+                        "returnPath": "chuckschwing@proton.me",
+                        "from": [
+                            "Chuck Schwing <chuckschwing@proton.me>"
+                        ],
+                        "date": "Tue, 28 Apr 2026 02:30:30 +0000",
+                        "to": [
+                            "fbpadmin <fbpadmin@my-fbp.com>"
+                        ],
+                        "messageId": "<C435wiCgxLs9-4ETTvOt7dBrszS_OHwVaVv2bAFl4IfyfOeta2tMZJs1VQ86NUAbhNOxBM6jepUhoYvDlGBxVwbs3fbrDbPYV4uHOY_LaRw=@proton.me>",
+                        "subject": "Number 11"
+                    }
+                },
+                "receipt": {
+                    "timestamp": "2026-04-28T02:30:36.738Z",
+                    "processingTimeMillis": 1828,
+                    "recipients": [
+                        "fbpadmin@my-fbp.com"
+                    ],
+                    "spamVerdict": {
+                        "status": "PASS"
+                    },
+                    "virusVerdict": {
+                        "status": "PASS"
+                    },
+                    "spfVerdict": {
+                        "status": "PASS"
+                    },
+                    "dkimVerdict": {
+                        "status": "PASS"
+                    },
+                    "dmarcVerdict": {
+                        "status": "PASS"
+                    },
+                    "action": {
+                        "type": "Lambda",
+                        "functionArn": "arn:aws:lambda:us-east-1:768286545465:function:fbp-lambda-v1-python-email-forwarder",
+                        "invocationType": "Event"
+                    }
+                }
+            }
+        }
+    ]
+}

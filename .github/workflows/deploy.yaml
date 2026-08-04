@@ -1,0 +1,75 @@
+name: Deploy FBP-main App
+
+on:
+  # push:
+  #   branches: [main]
+  workflow_dispatch:
+    # branches:
+      # - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      STACK_NAME: fbp
+      S3_BUCKET: my-fbp.com
+      S3_LAMBDA_BUCKET: my-fbp.com-v2
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+          
+      - name: Setup SAM CLI
+        uses: aws-actions/setup-sam@v3
+        with:
+          use-installer: true
+
+      - name: Restore Twilio Layer Artifact
+        run: |
+          mkdir -p twilio-layer
+          aws s3 cp s3://$S3_BUCKET/twilio-layer/twilio-layer.zip twilio-layer/twilio-layer.zip
+          ls -lh twilio-layer/twilio-layer.zip
+
+      - name: Build and Deploy Lambda Functions
+        run: |
+          sam build          # Finds ./template.yaml
+          sam deploy --stack-name $STACK_NAME --s3-bucket $S3_LAMBDA_BUCKET --capabilities CAPABILITY_IAM --no-confirm-changeset --no-fail-on-empty-changeset    
+      - name: Build FBP App
+        run: |
+          echo "Building FBP app from root directory..."
+      - name: Deploy FBP App to S3
+        run: |
+          aws s3 cp . s3://$S3_BUCKET \
+            --recursive \
+            --exclude "*" \
+            --include "*.html" \
+            --include "*.css" \
+            --include "*.js" \
+            --include "*.map" \
+            --include "*.txt" \
+            --include "*.gif" \
+            --include "*.png" \
+            --exclude "schedule/*" \
+            --exclude "src/*" \
+            --exclude ".aws-sam/*" \
+            --exclude ".debugger/*" \
+            --exclude "node_modules/*" \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude ".vscode/*" \
+            --exclude "*.yaml" \
+
+          echo "✅ FBP App deployed to S3"
+          
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+          echo "✅ CloudFront cache invalidated"

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authentication Callback - OIDC Auth Demo</title>
+  <!-- Load the OIDC client library first -->
+  <script src="/js-lib/oidc-client-ts.min.js"></script>  
+</head>
+<body>
+  <div class="container">
+    <main>
+      <section class="callback-section">
+        <div class="card">
+          <div class="card-header">
+            <h2>Processing Authentication</h2>
+          </div>
+          <div class="card-content">
+            <div class="loading">
+              <p>Please wait while we complete the authentication process...</p>
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <!-- Then load our modules -->
+  <script type="module" src="/js/auth.js"></script>
+  <script type="module" src="/js/callback.js"></script>
+</body>
+</html>
+
