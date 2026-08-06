@@ -182,6 +182,7 @@ class EmailService:
 
                 case MessageType.GRIDSHEET:
                     users = self._get_bulk_users('emailGridSheet', channel="email")
+                    logger.info(f"Bulk Users: {users}")
                     if not users:
                         logger.info("No gridsheet users found")
                     for user in users:
@@ -708,6 +709,11 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
         if isinstance(event, dict) and "body" in event:
             body = event.get("body")
             payload = json.loads(body) if isinstance(body, str) else (body or {})
+        logger.info("Parsed payload", extra={
+            "raw_event": event,
+            "parsed_channel": payload.get("channel"),
+            "parsed_message_type": payload.get("message_type")
+        })
 
         channel = payload.get('channel', '').lower()
         message_type = payload.get('message_type')
