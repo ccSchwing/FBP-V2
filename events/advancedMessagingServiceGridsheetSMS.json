@@ -6,7 +6,7 @@
   "headers": {
     "content-type": "application/json"
   },
-  "body": "{\"message_type\":\"adhoc\", \"channel\":\"email\"}",
+  "body": "{\"message_type\":\"gridsheet\", \"channel\":\"sms\"}",
   "requestContext": {
     "http": {
       "method": "POST",

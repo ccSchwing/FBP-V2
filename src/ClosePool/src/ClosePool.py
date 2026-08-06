@@ -12,6 +12,9 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig, ProxyEventType
 from fbplib.fbpLog import fbpLog
 from fbplib.getCurrentWeek import getCurrentWeek
+from aws_lambda_powertools import Tracer
+tracer = Tracer()
+
 
 
 logging.basicConfig(format="%(levelname)s %(message)s")
@@ -45,6 +48,7 @@ app = APIGatewayHttpResolver(proxy_type=ProxyEventType.APIGatewayProxyEventV2, c
 ##
 # Close to Pool
 ##
+@tracer.capture_method
 @app.get("/closePool")
 def closePool():
     logging.info("Handling closePool request")
@@ -178,7 +182,6 @@ def closePool():
             if result.get("statusCode") == 200:
                 logging.info(f"SaveFBPPicks Body: {body}")
                 logging.info("SaveFBPPicks succeeded, proceeding to next steps.")
-                # Here you would add the logic to invoke the next Lambda functions for emailing users, updating pool status, etc.
         else:
             logging.error(
                 f"SaveFBPPicks failed with status code: {result.get('statusCode')}"
@@ -218,114 +221,49 @@ def closePool():
             ),
         }
 
-    # ##
-    # # Send PickSheet and GridSheet to users who have opted in.
-    # ##
-    # powertools_event = {
-    #     "version": "2.0",
-    #     "routeKey": "POST /sendEmail",
-    #     "rawPath": "/sendEmail",
-    #     "rawQueryString": "",
-    #     "headers": {"content-type": "application/json"},
-    #     "body": '{"templateName": "PickSheetTemplate"}',
-    #     "requestContext": {
-    #         "http": {
-    #             "method": "POST",
-    #             "path": "/sendEmail",
-    #             "protocol": "HTTP/1.1",
-    #             "sourceIp": "127.0.0.1",
-    #             "userAgent": "sam-local",
-    #         },
-    #         "routeKey": "POST /sendEmail",
-    #         "stage": "$default",
-    #     },
-    #     "isBase64Encoded": False,
-    # }
-
-    # sendEmailFunction = os.environ.get("SendEmail", "SendEmail")
-    # response = lambda_client.invoke(
-    #     FunctionName=sendEmailFunction,
-    #     InvocationType="RequestResponse",
-    #     Payload=json.dumps(powertools_event),
-    # )
-    # logging.info(f"SendEmail Response: {response}")
-    # result = json.loads(response["Payload"].read())
-    # logging.info(f"SendEmail Result: {result}")
-    # if result.get("statusCode") == 200:
-    #     body = result.get("body")
-    #     logging.info(f"SendEmail Body: {body}")
-    #     if isinstance(body, str):
-    #         body = json.loads(body)
-    #     if result.get("statusCode") == 200:
-    #         logging.info(f"SendEmail Body: {body}")
-    #         logging.info("SendEmail succeeded, proceeding to next steps.")
-    #         # Here you would add the logic to invoke the next Lambda functions for emailing users, updating pool status, etc.
-    # else:
-    #     logging.error(f"SendEmail failed with status code: {result.get('statusCode')}")
-    #     return {
-    #         "statusCode": 500,
-    #         "body": json.dumps(
-    #             {
-    #                 "status": "error",
-    #                 "message": f"SendEmail failed with status code: {result.get('statusCode')}",
-    #                 "details": result.get("body", {}),
-    #             }
-    #         ),
-    #     }
     ##
-    # Send GridSheet to users who have opted in.
-    ##
-    powertools_event = {
-        "version": "2.0",
-        "routeKey": "POST /sendEmail",
-        "rawPath": "/sendEmail",
-        "rawQueryString": "",
-        "headers": {"content-type": "application/json"},
-        "body": '{"templateName": "GridSheetTemplate"}',
-        "requestContext": {
-            "http": {
-                "method": "POST",
-                "path": "/sendEmail",
-                "protocol": "HTTP/1.1",
-                "sourceIp": "127.0.0.1",
-                "userAgent": "sam-local",
+    # Send gridsheet via AdvancedMessagingService for each channel.
+    advancedMessagingServiceFunction = os.environ.get("AdvancedMessagingService", "AdvancedMessagingService")
+    for channel in ["email", "sms"]:
+        powertools_event = {
+            "version": "2.0",
+            "routeKey": "POST /advanced-messaging",
+            "rawPath": "/advanced-messaging",
+            "rawQueryString": "",
+            "headers": {"content-type": "application/json"},
+            "body": json.dumps({"message_type": "gridsheet", "channel": channel}),
+            "requestContext": {
+                "http": {
+                    "method": "POST",
+                    "path": "/advanced-messaging",
+                    "protocol": "HTTP/1.1",
+                    "sourceIp": "127.0.0.1",
+                    "userAgent": "sam-local",
+                },
+                "routeKey": "POST /advanced-messaging",
+                "stage": "$default",
             },
-            "routeKey": "POST /sendEmail",
-            "stage": "$default",
-        },
-        "isBase64Encoded": False,
-    }
-
-    sendEmailFunction = os.environ.get("SendEmail", "SendEmail")
-    response = lambda_client.invoke(
-        FunctionName=sendEmailFunction,
-        InvocationType="RequestResponse",
-        Payload=json.dumps(powertools_event),
-    )
-    logging.info(f"SendEmail Response: {response}")
-    result = json.loads(response["Payload"].read())
-    logging.info(f"SendEmail Result: {result}")
-    if result.get("statusCode") == 200:
-        body = result.get("body")
-        logging.info(f"SendEmail Body: {body}")
-        if isinstance(body, str):
-            body = json.loads(body)
-        if result.get("statusCode") == 200:
-            logging.info(f"SendEmail Body: {body}")
-            logging.info("SendEmail succeeded, proceeding to next steps.")
-            # Here you would add the logic to invoke the next Lambda functions for emailing users, updating pool status, etc.
-    else:
-        logging.error(f"SendEmail failed with status code: {result.get('statusCode')}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"SendEmail failed with status code: {result.get('statusCode')}",
-                    "details": result.get("body", {}),
-                }
-            ),
+            "isBase64Encoded": False,
         }
+        response = lambda_client.invoke(
+            FunctionName=advancedMessagingServiceFunction,
+            InvocationType="RequestResponse",
+            Payload=json.dumps(powertools_event),
+        )
+        result = json.loads(response["Payload"].read())
+        logging.info(f"AdvancedMessagingService [{channel}] Result: {result}")
+        if not result.get("success"):
+            logging.error(f"AdvancedMessagingService [{channel}] failed with status code: {result.get('error')}")
+            return {
+                "statusCode": 500,
+                "body": json.dumps(
+                    {
+                        "status": "error",
+                        "message": f"AdvancedMessagingService [{channel}] failed with error: {result.get('error')}",
+                        "details": result,
+                    }
+                ),
+            }
 
     # Get the Lambda function name from environment variable or use a default value
     setPoolStatusClosed = os.environ.get("SetPoolStatusClosed", "SetPoolStatusClosed")
@@ -410,6 +348,8 @@ def closePool():
                 }
             ),
         }
+@tracer.capture_lambda_handler
 def lambda_handler(event, context) -> dict[str, Any]:
     logging.info(f"Received event: {event}")
+    logger.info("ccs was here!")
     return app.resolve(event, context)

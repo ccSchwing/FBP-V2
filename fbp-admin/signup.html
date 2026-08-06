@@ -186,7 +186,7 @@
       }
     }
     window.AddNewUser = AddNewUser;
-    
+
     async function GetNewUser(emailAddr) {
       if (!emailAddr || emailAddr === "undefined") {
         alert("Please enter a valid email address.");
@@ -220,16 +220,16 @@
     async function sendWelcomeEmail(email, firstName) {
       const templateName = "WelcomeEmailTemplate";
       try {
-        const emailURL = await getServiceUrl("sendEmail");
+        const emailURL = await getServiceUrl("advancedMessagingService");
         const response = await fetch(`${emailURL}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email: email, firstName: firstName, templateName: templateName }),
+          body: "{\"message_type\":\"welcome\", \"channel\":\"email\"}",
         });
         const data = await response.text();
-        console.log("sendEmail Lambda Response:", data);
+        console.log("advancedMessagingService Lambda Response:", data);
         if (response.ok) {
           return data;
         } else {

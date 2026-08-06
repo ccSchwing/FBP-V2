@@ -36,3 +36,4 @@ getTeamRecords:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getTe
 chatbot:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/chatbot
 getCurrentWeek:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/getCurrentWeek
 htmlToPdf:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/htmlToPdf
+advancedMessagingService:https://h0t2ze7abl.execute-api.us-east-1.amazonaws.com/prod/advanced-messaging

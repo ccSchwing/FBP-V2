@@ -587,7 +587,9 @@ Resources:
           FBPLogsTableName: !Ref FBPLogsTableName
           SetPoolStatusClosed: !Ref SetPoolStatusClosed # Close pool for the week. This is the last thing done.
           SaveFBPPicks: !Ref SaveFBPPicks # Validate user picks
-          SendEmail: !Ref SendEmail # Send email for PickSheet and GridSheet.
+          ##
+          # replaced by AdvancedMessagingService for sending messages to users.
+          # SendEmail: !Ref SendEmail # Send email for PickSheet and GridSheet.
           ImportSpreadsAndFinalScores: !Ref ImportSpreadsAndFinalScores # Import spreads and final scores for the week.
           AdvancedMessagingService: !Ref AdvancedMessagingService # Send messages to users about new week and weekly results.
       Policies:
@@ -1713,6 +1715,7 @@ Resources:
   SetPoolStatusClosed:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: !Sub ${AWS::StackName}-set-pool-status-closed
       CodeUri: src/SetPoolStatus/src/
       Handler: SetPoolStatus.lambda_handler
       Runtime: python3.12
