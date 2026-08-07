@@ -6,6 +6,7 @@ use_container = true
 stack_name = "fbp"
 s3_bucket = "my-fbp.com-v2"
 resolve_s3 = false
+disable_rollback = "true"
 s3_prefix = "fbp"
 template_file = ".aws-sam/build/template.yaml"
 confirm_changeset = true

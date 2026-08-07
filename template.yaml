@@ -107,7 +107,98 @@ Parameters:
     Type: String
     Description: ID of the Bedrock data source
     Default: LULFE6CQPM
+
 Resources:
+  FBPHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowHeaders:
+          - content-type
+          - x-amz-date
+          - authorization
+          - x-api-key
+          - x-amz-security-token
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        AllowOrigins:
+          - "*"
+        MaxAge: 300
+  MyApiMapping:          # ← add it here, same level as everything else
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName: my-fbp.com
+      ApiId: !Ref FBPHttpApi
+      Stage: !Ref FBPHttpApiprodStage
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - my-fbp.com
+          - www.my-fbp.com
+        Origins:
+          - Id: S3WebsiteOrigin
+            DomainName: my-fbp.com.s3-website-us-east-1.amazonaws.com
+            CustomOriginConfig:
+              HTTPPort: 80
+              OriginProtocolPolicy: http-only
+          - Id: ApiGatewayOrigin
+            DomainName: !Sub "${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+        DefaultCacheBehavior:
+          TargetOriginId: S3WebsiteOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          AllowedMethods: [GET, HEAD]
+        CacheBehaviors:
+          - PathPattern: /prod/*
+            TargetOriginId: ApiGatewayOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+        ViewerCertificate:
+          AcmCertificateArn: arn:aws:acm:us-east-1:768286545465:certificate/f93ac44f-bcd3-4ab9-95b0-c22d185f9259
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        # WebACLId: arn:aws:wafv2:us-east-1:768286545465:global/webacl/CreatedByCloudFront-66e05333/dbf250cb-7899-4d67-b067-8da1024f4266
+        Enabled: true
+        HttpVersion: http2
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+
+  # Route 53 A Record
+  Route53ARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: my-fbp.com.
+      Name: my-fbp.com.
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront hosted zone ID (always this value)
+        EvaluateTargetHealth: false
+
+  # Route 53 AAAA Record (IPv6)
+  Route53AAAARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: my-fbp.com.
+      Name: my-fbp.com.
+      Type: AAAA
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
   FBPLibLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
@@ -149,14 +240,14 @@ Resources:
         TwilioWebHookPost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /twilio-webhook
             Method: post
             PayloadFormatVersion: '2.0'
         TwilioWebHookOptionsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /twilio-webhook
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -202,14 +293,14 @@ Resources:
         HTMLtoPDFPostApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /htmlToPdf
             Method: post
             PayloadFormatVersion: '2.0'
         HTMLtoPDFOptionsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /htmlToPdf
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -251,7 +342,7 @@ Resources:
         ChatBotPostApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /chatbot
             Method: post
             PayloadFormatVersion: '2.0'
@@ -321,14 +412,14 @@ Resources:
         ChatBotSyncPostApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /chatbotsync
             Method: post
             PayloadFormatVersion: '2.0'
         ChatBotSyncOptionsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /chatbotsync
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -355,14 +446,14 @@ Resources:
         GetCurrentWeekPostApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getCurrentWeek
             Method: post
             PayloadFormatVersion: '2.0'
         GetCurrentWeekOptionsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getCurrentWeek
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -394,14 +485,14 @@ Resources:
         TeamRecordGetApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateTeamRecords
             Method: get
             PayloadFormatVersion: '2.0'
         TeamRecordOptionsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateTeamRecords
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -430,14 +521,14 @@ Resources:
         GetTeamRecordsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getTeamRecords
             Method: get
             PayloadFormatVersion: '2.0'
         GetTeamRecordsOptionsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getTeamRecords
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -472,21 +563,21 @@ Resources:
         FBPLedgerGetApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getFBPLedger
             Method: get
             PayloadFormatVersion: '2.0'
         FBPLedgerPostDepositApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /deposit
             Method: post
             PayloadFormatVersion: '2.0'
         FBPLedgerPostPayoutApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /payout
             Method: post
             PayloadFormatVersion: '2.0'
@@ -612,14 +703,14 @@ Resources:
         ClosePoolGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /closePool
             Method: GET
             PayloadFormatVersion: '2.0'
         ClosePoolOPTIONS:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /closePool
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -750,14 +841,14 @@ Resources:
         AdvancedMessagingServicePost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /advanced-messaging
             Method: POST
             PayloadFormatVersion: '2.0'
         AdvancedMessagingServiceOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /advanced-messaging
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -825,14 +916,14 @@ Resources:
         AdvancedSMSServicePost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /advanced-sms
             Method: POST
             PayloadFormatVersion: '2.0'
         GetUserStatusOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /advanced-sms
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -903,14 +994,14 @@ Resources:
         AdvancedEmailServicePost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /advanced-email
             Method: POST
             PayloadFormatVersion: '2.0'
         GetUserStatusOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /advanced-email
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1002,42 +1093,42 @@ Resources:
         StoreSMSVerificationCodePost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /storeSMSVerificationCode
             Method: POST
             PayloadFormatVersion: '2.0'
         StoreSMSVerificationCodeOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /storeSMSVerificationCode
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
         GetSMSVerificationCodePost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getSMSVerificationCode
             Method: POST
             PayloadFormatVersion: '2.0'
         GetSMSVerificationCodeOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getSMSVerificationCode
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
         UpdateSMSVerificationPost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateSMSVerification
             Method: POST
             PayloadFormatVersion: '2.0'
         UpdateSMSVerificationOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateSMSVerification
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1066,14 +1157,14 @@ Resources:
         GetUserStatusPost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getUserStatus
             Method: POST
             PayloadFormatVersion: '2.0'
         GetUserStatusOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getUserStatus
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1099,14 +1190,14 @@ Resources:
         QueryFBPLogsPost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /queryFBPLogs
             Method: POST
             PayloadFormatVersion: '2.0'
         QueryFBPLogsOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /queryFBPLogs
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1135,14 +1226,14 @@ Resources:
         GetScheduleGet:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getschedule
             Method: GET
             PayloadFormatVersion: '2.0'
         GetScheduleOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getschedule
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1176,14 +1267,14 @@ Resources:
         ResetDBsGet:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /resetDBs
             Method: GET
             PayloadFormatVersion: '2.0'
         ResetDBsOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /resetDBs
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1212,14 +1303,14 @@ Resources:
         SendEmailPost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /sendEmail
             Method: POST
             PayloadFormatVersion: '2.0'
         SendEmailOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /sendEmail
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1249,14 +1340,14 @@ Resources:
         GetStandingsGet:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getStandings
             Method: GET
             PayloadFormatVersion: '2.0'
         GetStandingsOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getStandings
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1286,14 +1377,14 @@ Resources:
         GetListForEmailPost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getListForEmail
             Method: GET
             PayloadFormatVersion: '2.0'
         GetListForEmailOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getListForEmail
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1320,14 +1411,14 @@ Resources:
         GetFBPEmailAndDisplayNameGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getFBPUserEmailAndDisplayName
             Method: GET
             PayloadFormatVersion: '2.0'
         GetFBPEmailAndDisplayNameOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getFBPUserEmailAndDisplayName
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1353,14 +1444,14 @@ Resources:
         GetAllFBPEmailAndDisplayNameGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getAllFBPUserEmailAndDisplayName
             Method: GET
             PayloadFormatVersion: '2.0'
         GetAllFBPEmailAndDisplayNameOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getAllFBPUserEmailAndDisplayName
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1398,28 +1489,28 @@ Resources:
         UpdateWeeklyResultsGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateWeeklyResults
             Method: GET
             PayloadFormatVersion: '2.0'
         UpdateWeeklyResultsOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateWeeklyResults
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
         UpdateTotalCorrectAndIncorrectPicksGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateTotalCorrectAndIncorrectPicks
             Method: GET
             PayloadFormatVersion: '2.0'
         UpdateTotalCorrectAndIncorrectPicksOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateTotalCorrectAndIncorrectPicks
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1455,14 +1546,14 @@ Resources:
         CalcWeeklyResultsGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /calcWeeklyResults
             Method: GET
             PayloadFormatVersion: '2.0'
         CalcWeeklyResultsOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /calcWeeklyResults
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1500,14 +1591,14 @@ Resources:
         GetWeeklyResultsGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getWeeklyResults
             Method: GET
             PayloadFormatVersion: '2.0'
         GetWeeklyResultsOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getWeeklyResults
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1543,28 +1634,28 @@ Resources:
         SaveFBPPicksPOST:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /saveFBPPicks
             Method: POST
             PayloadFormatVersion: '2.0'
         SaveFBPPicksOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /saveFBPPicks
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
         ValidateAndFixFBPPicksPOST:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /validateAndFixFBPPicks
             Method: POST
             PayloadFormatVersion: '2.0'
         ValidateAndFixFBPPicksOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /validateAndFixFBPPicks
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1594,14 +1685,14 @@ Resources:
         GetPickSheetGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getPickSheet
             Method: GET
             PayloadFormatVersion: '2.0'
         GetPickSheetOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getPickSheet
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1627,13 +1718,13 @@ Resources:
         GetPoolOpen:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getPoolOpen
             Method: GET
         GetPoolOpenOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getPoolOpen
             Method: OPTIONS
   GetPoolConfig:
@@ -1652,7 +1743,7 @@ Resources:
         GetPoolConfig:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getPoolConfig
             Method: GET
 
@@ -1700,14 +1791,14 @@ Resources:
         SetPoolStatusOpenPOST:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /setPoolStatusOpen
             Method: POST
             PayloadFormatVersion: '2.0'
         SetPoolStatusOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /setPoolStatusOpen
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1734,14 +1825,14 @@ Resources:
         SetPoolStatusClosedPOST:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /setPoolStatusClosed
             Method: POST
             PayloadFormatVersion: '2.0'
         SetPoolStatusClosedOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /setPoolStatusClosed
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1768,7 +1859,7 @@ Resources:
         GetFBPUser:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getFBPUserPython
             Method: POST
             PayloadFormatVersion: '2.0'
@@ -1800,7 +1891,7 @@ Resources:
         UpdateFBPUserPython:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateFBPUser
             Method: POST
             PayloadFormatVersion: '2.0'
@@ -1832,7 +1923,7 @@ Resources:
         AddFBPUser:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /addFBPUser
             Method: POST
             PayloadFormatVersion: '2.0'
@@ -1863,7 +1954,7 @@ Resources:
         GetFBPPicks:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getFBPPicksPython
             Method: POST
             PayloadFormatVersion: '2.0'
@@ -1900,14 +1991,14 @@ Resources:
         GetAllFBPPicks:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getAllFBPPicks
             Method: GET
             PayloadFormatVersion: '2.0'
         GetAllFBPPicksOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getAllFBPPicks
             Method: OPTIONS
 
@@ -1919,12 +2010,12 @@ Resources:
 Outputs:
   HttpAPiUrl:
     Description: URL of the HTTP API gateway
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/
     Export:
       Name: !Sub ${AWS::StackName}-HttpApiUrl
   HttpApiId:
     Description: HTTP API ID
-    Value: !Ref MyHttpApi
+    Value: !Ref FBPHttpApi
     Export:
       Name: !Sub ${AWS::StackName}-HttpApiId
   HtmlToPdfFunctionName:
@@ -1934,7 +2025,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-HtmlToPdf
   HtmlToPdfEndpoint:
     Description: Endpoint for the HtmlToPdf API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/htmlToPdf
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/htmlToPdf
     Export:
       Name: !Sub ${AWS::StackName}-HtmlToPdfEndpoint
   ChatBotFunctionName:
@@ -1944,7 +2035,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-ChatBot
   ChatBotEndpoint:
     Description: Endpoint for the ChatBot API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/chatbot
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/chatbot
     Export:
       Name: !Sub ${AWS::StackName}-ChatBotEndpoint
   ChatBotSyncFunctionName:
@@ -1954,7 +2045,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-ChatBotSync
   ChatBotSyncEndpoint:
     Description: Endpoint for the ChatBotSync API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/chatbotsync
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/chatbotsync
     Export:
       Name: !Sub ${AWS::StackName}-ChatBotSyncEndpoint
   ImportSpreadsAndFinalScoresFunctionName:
@@ -1964,7 +2055,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-ImportSpreadsAndFinalScores
   ImportSpreadsAndFinalScoresEndpoint:
     Description: Endpoint for the ImportSpreadsAndFinalScores API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/importSpreadsAndFinalScores
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/importSpreadsAndFinalScores
     Export:
       Name: !Sub ${AWS::StackName}-ImportSpreadsAndFinalScoresEndpoint
   AdvancedMessagingServiceFunctionName:
@@ -1974,7 +2065,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-AdvancedMessagingService
   AdvancedMessagingServiceEndpoint:
     Description: Endpoint for the AdvancedMessagingService API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/advanced-messaging
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/advanced-messaging
     Export:
       Name: !Sub ${AWS::StackName}-AdvancedMessagingEndpoint
   AdvancedSMSServiceFunctionName:
@@ -1986,7 +2077,7 @@ Outputs:
   AdvancedSMSServiceEndpoint:
     Description: Endpoint for the AdvancedSMSService API (retained until
       AdvancedMessagingService is verified)
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/advancedSMSService
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/advancedSMSService
     Export:
       Name: !Sub ${AWS::StackName}-AdvancedSMSEndpoint
   # TwilioWebhookFunctionName:
@@ -1996,7 +2087,7 @@ Outputs:
   #     Name: !Sub "${AWS::StackName}-twilio-webhook"
   TwilioWebhookEndpoint:
     Description: Endpoint for the TwilioWebhook API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/twilio-webhook
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/twilio-webhook
     Export:
       Name: !Sub ${AWS::StackName}-twilio-webhook-endpoint
   SMSVerificationFunctionName:
@@ -2006,22 +2097,22 @@ Outputs:
       Name: !Sub ${AWS::StackName}-SMSVerificationCodeFunctionName
   SMSStoreVerificationCodeEndpoint:
     Description: Endpoint for sending SMS verification codes
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/storeSMSVerificationCode
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/storeSMSVerificationCode
     Export:
       Name: !Sub ${AWS::StackName}-SMSStoreVerificationCodeEndpoint
   SMSGetVerificationCodeEndpoint:
     Description: Endpoint for sending SMS verification codes
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getSMSVerificationCode
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getSMSVerificationCode
     Export:
       Name: !Sub ${AWS::StackName}-SMSGetVerificationCodeEndpoint
   SMSUpdateVerificationCodeEndpoint:
     Description: Endpoint for updating SMS verification status
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/updateSMSVerification
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/updateSMSVerification
     Export:
       Name: !Sub ${AWS::StackName}-SMSUpdateVerificationCodeEndpoint
   GetTeamRecordsEndpoint:
     Description: Endpoint for the GetTeamRecords API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getTeamRecords
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getTeamRecords
     Export:
       Name: !Sub ${AWS::StackName}-GetTeamRecordsEndpoint
   FBPPayoutLedgerFunctionName:
@@ -2032,22 +2123,22 @@ Outputs:
   # API endpoints (add these)
   FBPLedgerApiBaseUrl:
     Description: Base URL of the FBP Ledger API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
       Name: !Sub ${AWS::StackName}-FBPLedgerApiBaseUrl
 
   # Optional: Specific endpoint URLs for convenience
   FBPLedgerGetEndpoint:
     Description: GET endpoint for FBP Ledger
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getFBPLedger
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getFBPLedger
 
   FBPLedgerDepositEndpoint:
     Description: POST endpoint for deposits
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/deposit
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/deposit
 
   FBPLedgerPayoutEndpoint:
     Description: POST endpoint for payouts
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/payout
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/payout
   GetUserStatusFunctionName:
     Description: Name of the GetUserStatus Lambda function
     Value: !Ref GetUserStatus
@@ -2055,7 +2146,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-GetUserStatusFunctionName
   GetUserStatusApi:
     Description: URL of the GetUserStatus API endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getUserStatus
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getUserStatus
     Export:
       Name: !Sub ${AWS::StackName}-GetUserStatusApi
   GetScheduleFunctionName:
@@ -2065,7 +2156,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-GetScheduleFunctionName
   GetScheduleApi:
     Description: URL of the GetSchedule API endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getschedule
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getschedule
     Export:
       Name: !Sub ${AWS::StackName}-GetScheduleApi
   QueryFBPLogsFunctionName:
@@ -2075,7 +2166,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-QueryFBPLogsFunctionName
   QueryFBPLogsApi:
     Description: URL of the QueryFBPLogs API endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/queryFBPLogs
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/queryFBPLogs
     Export:
       Name: !Sub ${AWS::StackName}-QueryFBPLogsApi
   EmailForwardingName:
@@ -2092,93 +2183,93 @@ Outputs:
   AdvancedEmailServiceApi:
     Description: URL of the Advanced Email Service API endpoint (retained until
       AdvancedMessagingService is verified)
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/advancedEmailService
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/advancedEmailService
     Export:
       Name: !Sub ${AWS::StackName}-AdvancedEmailServiceApi
   SendEmailApi:
     Description: SendEmail API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/sendEmail
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/sendEmail
     Export:
       Name: !Sub ${AWS::StackName}-SendEmailApi
 
   GetStandingsApi:
     Description: GetStandings API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getStandings
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getStandings
     Export:
       Name: !Sub ${AWS::StackName}-GetStandingsApi
   GetListForEmailApi:
     Description: GetListOfEmails API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getListForEmail
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getListForEmail
     Export:
       Name: !Sub ${AWS::StackName}-GetListForEmailApi
   GetAllFBPEmailAndDisplayNameApi:
     Description: GetAllFBPEmailAndDisplayName API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getAllFBPUserEmailAndDisplayName
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getAllFBPUserEmailAndDisplayName
     Export:
       Name: !Sub ${AWS::StackName}-GetAllFBPEmailAndDisplayNameApi
   GetFBPEmailAndDisplayNameApi:
     Description: GetFBPEmailAndDisplayName API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getFBPUserEmailAndDisplayName
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getFBPUserEmailAndDisplayName
     Export:
       Name: !Sub ${AWS::StackName}-GetFBPEmailAndDisplayNameApi
   GetWeeklyResultsApi:
     Description: GetWeeklyResults API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getWeeklyResults
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getWeeklyResults
     Export:
       Name: !Sub ${AWS::StackName}-GetWeeklyResultsApi
   CalcWeeklyResultsApi:
     Description: CalcWeeklyResults API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/calcWeeklyResults
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/calcWeeklyResults
     Export:
       Name: !Sub ${AWS::StackName}-CalcWeeklyResultsApi
   SaveFBPPicksApi:
     Description: SaveFBPPicks API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/saveFBPPicks
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/saveFBPPicks
     Export:
       Name: !Sub ${AWS::StackName}-SaveFBPPicksApi
   GetPickSheetApi:
     Description: GetPickSheet API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getPickSheetPython
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getPickSheetPython
     Export:
       Name: !Sub ${AWS::StackName}-GetPickSheetApi
   GetFBPPicksApi:
     Description: GetFBPPicks API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getFBPPicksPython
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getFBPPicksPython
     Export:
       Name: !Sub ${AWS::StackName}-GetFBPPicksApi
   GetPoolOpenApi:
     Description: GetPoolOpen API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getPoolOpen
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getPoolOpen
     Export:
       Name: !Sub ${AWS::StackName}-GetPoolOpenApi
 
   SetPoolStatusOpenApi:
     Description: SetPoolStatusOpen API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/setPoolStatusOpen
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/setPoolStatusOpen
     Export:
       Name: !Sub ${AWS::StackName}-SetPoolStatusApi
   SetPoolStatusClosedApi:
     Description: SetPoolStatusClosed API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/setPoolStatusClosed
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/setPoolStatusClosed
     Export:
       Name: !Sub ${AWS::StackName}-SetPoolStatusClosedApi
   GetFBPUserEndpoint:
     Description: GetFBPUser API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/getFBPUserPython
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/getFBPUserPython
     Export:
       Name: !Sub ${AWS::StackName}-GetFBPUserHttpApi
   GetAllFBPPicksEndpoint:
     Description: GetAllFBPPicks API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getAllFBPPicks
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getAllFBPPicks
     Export:
       Name: !Sub ${AWS::StackName}-GetAllFBPPicksHttpApi
   UpdateFBPUserPythonEndpoint:
     Description: UpdateFBPUserPython API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/updateFBPUser
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/updateFBPUser
     Export:
       Name: !Sub ${AWS::StackName}-AddOrUpdateFBPUserPythonHttpApi
   AddFBPUserEndpoint:
     Description: AddFBPUser API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/addFBPUser
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/addFBPUser
     Export:
       Name: !Sub ${AWS::StackName}-AddFBPUserHttpApi
