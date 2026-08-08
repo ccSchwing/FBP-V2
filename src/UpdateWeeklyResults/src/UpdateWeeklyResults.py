@@ -51,7 +51,7 @@ def updateTotalCorrectAndIncorrectPicks():
     logger.info(f"Using FBP Users DynamoDB table: {FBP_USERS_TABLE_NAME}")
     dynamodb = boto3.resource('dynamodb')
     usersTable = dynamodb.Table(FBP_USERS_TABLE_NAME)
-    FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResults2025Table', 'FBP-Weekly-Results-2025')
+    FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResultsTable', 'FBP-Weekly-Results-2025')
     logger.info(f"Using DynamoDB table: {FBP_WEEKLY_RESULTS_TABLE}")
     resultsTable = dynamodb.Table(FBP_WEEKLY_RESULTS_TABLE)
 
@@ -83,7 +83,7 @@ def updateTotalCorrectAndIncorrectPicks():
 
 @app.get("/updateWeeklyResults")
 def updateWeeklyResults():
-    FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResults2025Table', 'FBP-Weekly-Results-2025')
+    FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResultsTable', 'FBP-Weekly-Results-2025')
     logger.info(f"Using DynamoDB table: {FBP_WEEKLY_RESULTS_TABLE}")  # Log the table name being used
     fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", "Retrieving weekly results", "INFO")
     '''

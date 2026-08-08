@@ -10,21 +10,18 @@ Globals:
       Variables:
         POWERTOOLS_SERVICE_NAME: FBPService
 Parameters:
-  FBPUsersTableName:
+  Year:
     Type: String
-    Default: FBP-Users
-  FBPConfigTableName:
-    Type: String
-    Default: FBP-Config
-  FBPScheduleTableName:
-    Type: String
-    Default: 2025-Schedule
-  FBPPicksTableName:
-    Type: String
-    Default: FBP-Picks
-  FBPLogsTableName:
-    Type: String
-    Default: 2025-Log
+    Default: "2026"
+  # FBPUsersTableName:
+  #   Type: String
+  #   Default: FBP-Users
+  # FBPScheduleTableName:
+  #   Type: String
+  #   Default: 2025-Schedule
+  # FBPPicksTableName:
+  #   Type: String
+  #   Default: FBP-Picks
   # This is the original weekly results table.
   # After coding for a new table, this can be removed.
   FBPWeeklyResultsTableName:
@@ -34,18 +31,18 @@ Parameters:
   # It uses a Global Secondary Index on WeekIndex to make it easier to query by week.
   # It will replace the original FBPWeeklyResultsTableName after
   # we verify the new one is working correctly and update all code to use it.
-  FBPWeeklyResults2025TableName:
-    Type: String
-    Default: FBP-Weekly-Results-2025
+  # FBPWeeklyResults2025TableName:
+  #   Type: String
+  #   Default: FBP-Weekly-Results-2025
   FBPTeamRecordsTableName:
     Type: String
     Default: 2025-Record
-  TwilioOptOutTableName:
-    Type: String
-    Default: FBP-SMS-Opt-Outs
-  FBPPayoutLedgerTableName:
-    Type: String
-    Default: FBP-Payout-Ledger
+  # TwilioOptOutTableName:
+  #   Type: String
+  #   Default: FBP-SMS-Opt-Outs
+  # FBPPayoutLedgerTableName:
+  #   Type: String
+  #   Default: FBP-Payout-Ledger
   CloudFrontDomain:
     Type: String
     Default: my-fbp.com
@@ -56,9 +53,9 @@ Parameters:
     Type: String
     Default: WeekIndex
   # This is the GSI on the new weekly results table to make it easier to query by week.
-  FBPWeeklyResults2025WeekIndexName:
-    Type: String
-    Default: WeekIndex
+  # FBPWeeklyResults2025WeekIndexName:
+  #   Type: String
+  #   Default: WeekIndex
   S3BucketName:
     Type: String
     Default: my-fbp.com
@@ -135,6 +132,293 @@ Resources:
       DomainName: my-fbp.com
       ApiId: !Ref FBPHttpApi
       Stage: !Ref FBPHttpApiprodStage
+  ##
+  # DB tables
+  ##
+  DynamoDBLogsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-Log"
+      TableClass: STANDARD
+
+      # Key Schema
+      AttributeDefinitions:
+        - AttributeName: level
+          AttributeType: S   # String
+        - AttributeName: timestamp
+          AttributeType: S   # String
+      KeySchema:
+        - AttributeName: level
+          KeyType: HASH      # Partition Key
+        - AttributeName: timestamp
+          KeyType: RANGE     # Sort Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      # DynamoDB Streams
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+      # Deletion Protection (set to true to prevent accidental deletion)
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery (disabled to match original, enable if needed)
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+      # Tags (add any tags here as needed)
+      # Tags:
+      #   - Key: Environment
+      #     Value: Production
+  DynamoDBFBPUsersTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-FBP-Users"
+      TableClass: STANDARD
+
+      # Key Schema (Partition Key only - no Sort Key)
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S   # String
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH      # Partition Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+  DynamoDBScheduleTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-Schedule"
+      TableClass: STANDARD
+
+      # Key Schema
+      AttributeDefinitions:
+        - AttributeName: Week
+          AttributeType: N   # Number
+        - AttributeName: GameId
+          AttributeType: S   # String
+      KeySchema:
+        - AttributeName: Week
+          KeyType: HASH      # Partition Key
+        - AttributeName: GameId
+          KeyType: RANGE     # Sort Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+  DynamoDBFBPConfigTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-FBP-Config"
+      TableClass: STANDARD
+
+      # Key Schema (Partition Key only - no Sort Key)
+      AttributeDefinitions:
+        - AttributeName: Week
+          AttributeType: N   # Number
+      KeySchema:
+        - AttributeName: Week
+          KeyType: HASH      # Partition Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+  DynamoDBFBPPicksTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-FBP-Picks"
+      TableClass: STANDARD
+
+      # Key Schema (Partition Key only - no Sort Key)
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S   # String
+        - AttributeName: Week
+          AttributeType: N   # Number
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH      # Partition Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Global Secondary Index
+      GlobalSecondaryIndexes:
+        - IndexName: WeekIndex
+          KeySchema:
+            - AttributeName: Week
+              KeyType: HASH  # GSI Partition Key
+          Projection:
+            ProjectionType: ALL  # All attributes projected
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+  DynamoDBFBPSMSOptOutsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-FBP-SMS-Opt-Outs"
+      TableClass: STANDARD
+
+      # Key Schema (Partition Key only - no Sort Key)
+      AttributeDefinitions:
+        - AttributeName: phone_number
+          AttributeType: S   # String
+      KeySchema:
+        - AttributeName: phone_number
+          KeyType: HASH      # Partition Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+  DynamoDBFBPWeeklyResultsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-FBP-Weekly-Results"
+      TableClass: STANDARD
+
+      # Key Schema (Partition Key only - no Sort Key)
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S   # String
+        - AttributeName: Week
+          AttributeType: N   # Number
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH      # Partition Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Global Secondary Index
+      GlobalSecondaryIndexes:
+        - IndexName: WeekIndex
+          KeySchema:
+            - AttributeName: Week
+              KeyType: HASH  # GSI Partition Key
+          Projection:
+            ProjectionType: ALL  # All attributes projected
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  DynamoDBFBPPayoutLedgerTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-FBP-Payout-Ledger"
+      TableClass: STANDARD
+
+      # Key Schema
+      AttributeDefinitions:
+        - AttributeName: RecordType
+          AttributeType: S   # String
+        - AttributeName: Timestamp
+          AttributeType: S   # String
+      KeySchema:
+        - AttributeName: RecordType
+          KeyType: HASH      # Partition Key
+        - AttributeName: Timestamp
+          KeyType: RANGE     # Sort Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -229,13 +513,13 @@ Resources:
         - !Ref TwilioLayer
       Environment:
         Variables:
-          TwilioOptOutTableName: !Ref TwilioOptOutTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          TwilioOptOutTableName: !Sub "${Year}-FBP-SMS-Opt-Outs"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref TwilioOptOutTableName
+            TableName: !Sub "${Year}-FBP-SMS-Opt-Outs"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Events:
         TwilioWebHookPost:
           Type: HttpApi
@@ -360,24 +644,24 @@ Resources:
           KnowledgeBaseId: !Ref KnowledgeBaseId
           DataSourceId: !Ref DataSourceId
           S3BucketName: !Ref S3BucketName
-          FBPScheduleTableName: !Ref FBPScheduleTableName
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
 
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
         - Version: '2012-10-17'
           Statement:
             - Effect: Allow
@@ -435,13 +719,13 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Events:
         GetCurrentWeekPostApi:
           Type: HttpApi
@@ -468,17 +752,17 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
           FBPTeamRecordsTableName: !Ref FBPTeamRecordsTableName
-          FBPScheduleTableName: !Ref FBPScheduleTableName
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
         - DynamoDBCrudPolicy:
             TableName: !Ref FBPTeamRecordsTableName
       Events:
@@ -507,14 +791,14 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
           FBPTeamRecordsTableName: !Ref FBPTeamRecordsTableName
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
             TableName: !Ref FBPTeamRecordsTableName
       Events:
@@ -543,22 +827,22 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPPayoutLedgerTableName: !Ref FBPPayoutLedgerTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPPayoutLedgerTableName: !Sub "${Year}-FBP-Payout-Ledger"
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPPayoutLedgerTableName
+            TableName: !Sub "${Year}-FBP-Payout-Ledger"
       Events:
         FBPLedgerGetApi:
           Type: HttpApi
@@ -592,17 +876,17 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPSchedule2025TableName: !Ref FBPScheduleTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
           S3BucketName: !Ref S3BucketName
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
         - Version: '2012-10-17'
           Statement:
             - Effect: Allow
@@ -634,15 +918,15 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
           SetPoolStatusOpen: !Ref SetPoolStatusOpen # Open pool for new week.
           CalcWeeklyResults: !Ref CalcWeeklyResults # Calc NFL Game Results for the week just ended.
           UpdateWeeklyResults: !Ref UpdateWeeklyResults # Update User results.
           ImportSpreadsAndFinalScores: !Ref ImportSpreadsAndFinalScores # Import spreads and final scores for the week.
           AdvancedMessagingService: !Ref AdvancedMessagingService # Send messages to users about new week and weekly results.
           SendEmail: !Ref SendEmail
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -657,11 +941,11 @@ Resources:
                 - !GetAtt SendEmail.Arn
                 - !GetAtt SetPoolStatusOpen.Arn
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
 
   ClosePool:
     Type: AWS::Serverless::Function
@@ -674,8 +958,8 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
           SetPoolStatusClosed: !Ref SetPoolStatusClosed # Close pool for the week. This is the last thing done.
           SaveFBPPicks: !Ref SaveFBPPicks # Validate user picks
           ##
@@ -696,9 +980,9 @@ Resources:
                 - !GetAtt ImportSpreadsAndFinalScores.Arn # Import spreads and final scores for the week.
                 - !GetAtt AdvancedMessagingService.Arn # Send messages to users about new week and weekly results.
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Events:
         ClosePoolGET:
           Type: HttpApi
@@ -806,12 +1090,12 @@ Resources:
                   - dynamodb:Query
                   - dynamodb:PutItem
                 Resource:
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${FBPUsersTableName}
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${FBPLogsTableName}
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TwilioOptOutTableName}
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${FBPConfigTableName}
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${FBPWeeklyResults2025TableName}
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${FBPWeeklyResults2025TableName}/index/${FBPWeeklyResults2025WeekIndexName}
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Users
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-Log
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-Twilio-Opt-Out
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Config
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Weekly-Results
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Weekly-Results/index/${FBPWeeklyResultsWeekIndexName}
 
         - PolicyName: XRayPolicy
           PolicyDocument:
@@ -858,9 +1142,9 @@ Resources:
           COMPANY_NAME: !Ref CompanyName
           BASE_URL: !Ref BaseUrl
           SUPPORT_EMAIL: !Ref SupportEmail
-          FBPUSERS_TABLE_NAME: !Ref FBPUsersTableName
-          FBPLOGS_TABLE_NAME: !Ref FBPLogsTableName
-          TWILIO_OPT_OUT_TABLE_NAME: !Ref TwilioOptOutTableName
+          FBPUSERS_TABLE_NAME: !Sub "${Year}-FBP-Users"
+          FBPLOGS_TABLE_NAME: !Sub "${Year}-Log"
+          TWILIO_OPT_OUT_TABLE_NAME: !Sub "${Year}-Twilio-Opt-Outs"
           TWILIO_CREDENTIALS_SECRET_ARN: !Ref TwilioCredentialsSecretArn
           POWERTOOLS_SERVICE_NAME: messaging-service
           POWERTOOLS_LOG_LEVEL: INFO
@@ -935,9 +1219,9 @@ Resources:
           COMPANY_NAME: !Ref CompanyName
           BASE_URL: !Ref BaseUrl
           SUPPORT_EMAIL: !Ref SupportEmail
-          FBPUSERS_TABLE_NAME: !Ref FBPUsersTableName
-          FBPLOGS_TABLE_NAME: !Ref FBPLogsTableName
-          TWILIO_OPT_OUT_TABLE_NAME: !Ref TwilioOptOutTableName
+          FBPUSERS_TABLE_NAME: !Sub "${Year}-FBP-Users"
+          FBPLOGS_TABLE_NAME: !Sub "${Year}-Log"
+          TWILIO_OPT_OUT_TABLE_NAME: !Sub "${Year}-Twilio-Opt-Outs"
           TWILIO_CREDENTIALS_SECRET_ARN: !Ref TwilioCredentialsSecretArn
           # Powertools configuration
           POWERTOOLS_SERVICE_NAME: email-service
@@ -1012,8 +1296,8 @@ Resources:
           COMPANY_NAME: !Ref CompanyName
           BASE_URL: !Ref BaseUrl
           SUPPORT_EMAIL: !Ref SupportEmail
-          FBPUSERS_TABLE_NAME: !Ref FBPUsersTableName
-          FBPLOGS_TABLE_NAME: !Ref FBPLogsTableName
+          FBPUSERS_TABLE_NAME: !Sub "${Year}-FBP-Users"
+          FBPLOGS_TABLE_NAME: !Sub "${Year}-Log"
 
           # Powertools configuration
           POWERTOOLS_SERVICE_NAME: email-service
@@ -1059,10 +1343,10 @@ Resources:
                   - dynamodb:UpdateItem
                   - dynamodb:DeleteItem
                 Resource:
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FBP-Config
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/2025-Log
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FBP-Users
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FBP-Weekly-Results-2025
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Config
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-Log
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Users
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Weekly-Results
 
   SMSValidationUtils:
     Type: AWS::Serverless::Function
@@ -1073,9 +1357,9 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - Statement:
             - Effect: Allow
               Action:
@@ -1083,8 +1367,8 @@ Resources:
               Resource: !Ref TwilioCredentialsSecretArn
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
           TWILIO_CREDENTIALS_SECRET_ARN: !Ref TwilioCredentialsSecretArn
       Layers:
         - !Ref FBPLibLayer
@@ -1141,16 +1425,16 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1179,13 +1463,13 @@ Resources:
         - !Ref FBPLibLayer
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
       Environment:
         Variables:
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Events:
         QueryFBPLogsPost:
           Type: HttpApi
@@ -1212,16 +1496,16 @@ Resources:
         - !Ref FBPLibLayer
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
       Environment:
         Variables:
-          FBPScheduleTableName: !Ref FBPScheduleTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Events:
         GetScheduleGet:
           Type: HttpApi
@@ -1247,21 +1531,21 @@ Resources:
         - !Ref FBPLibLayer
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
       Environment:
         Variables:
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPUsersTableName: !Ref FBPUsersTableName
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
 
       Events:
         ResetDBsGet:
@@ -1287,13 +1571,13 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
       Environment:
         Variables:
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
       # SES stuff
       Role: !GetAtt SendEmailRole.Arn
 
@@ -1323,17 +1607,17 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
 
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1360,17 +1644,17 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
 
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1397,14 +1681,14 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
 
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1430,14 +1714,14 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
 
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1464,25 +1748,25 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub 
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
-          FBPScheduleTableName: !Ref FBPScheduleTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1524,22 +1808,22 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPScheduleTableName: !Ref FBPScheduleTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1566,25 +1850,24 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPWeeklyResultsTableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub 
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPWeeklyResultsTableName: !Ref FBPWeeklyResultsTableName
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1613,21 +1896,21 @@ Resources:
       Tracing: Active
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPUsersTableName: !Ref FBPUsersTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1669,16 +1952,16 @@ Resources:
       MemorySize: 1024
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPScheduleTableName: !Ref FBPScheduleTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1705,13 +1988,13 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1735,10 +2018,10 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Events:
         GetPoolConfig:
           Type: HttpApi
@@ -1778,13 +2061,13 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1812,13 +2095,13 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1845,16 +2128,16 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Events:
         GetFBPUser:
           Type: HttpApi
@@ -1874,19 +2157,19 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
       Events:
         UpdateFBPUserPython:
           Type: HttpApi
@@ -1906,19 +2189,19 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Events:
         AddFBPUser:
           Type: HttpApi
@@ -1938,16 +2221,16 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -1969,23 +2252,23 @@ Resources:
         - !Ref FBPLibLayer
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - Statement:
             - Effect: Allow
               Action: lambda:InvokeFunction
               Resource: !GetAtt GetPoolConfig.Arn
       Environment:
         Variables:
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
           GET_POOL_CONFIG_FUNCTION: !Ref GetPoolConfig
       Events:
         GetAllFBPPicks:

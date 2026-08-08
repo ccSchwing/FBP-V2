@@ -58,14 +58,14 @@ def _get_winner() -> Optional[str]:
         return None
     else:
         current_week = current_week - 1  # Adjust to get the previous week
-    winners_table_name = os.environ.get('FBPWeeklyResults2025TableName', default='FBP-Weekly-Results-2025')
+    winners_table_name = os.environ.get('FBPWeeklyResultsTableName', default='FBP-Weekly-Results-2025')
     if not winners_table_name:
-        logger.info("FBPWeeklyResults2025TableName not set; cannot get winner")
+        logger.info("FBPWeeklyResultsTableName not set; cannot get winner")
         return None
     try:
         table = boto3.resource('dynamodb').Table(winners_table_name)
         response = table.query(
-            IndexName=os.environ.get('FBPWeeklyResults2025WeekIndexName', 'WeekIndex'),
+            IndexName=os.environ.get('FBPWeeklyResultsWeekIndexName', 'WeekIndex'),
             KeyConditionExpression='#wk = :wk',
             FilterExpression='#win = :w',
             ExpressionAttributeNames={'#wk': 'week', '#win': 'winner'},
