@@ -38,7 +38,7 @@ app = APIGatewayHttpResolver(cors=cors_config)
 FBP_USERS_TABLE_NAME = os.environ.get('FBPUsersTableName', 'FBP-Users')
 logger.info(f"Using FBP Picks DynamoDB table: {FBP_USERS_TABLE_NAME}")
 
-FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResults2025TableName', 'FBP-Weekly-Results-2025')
+FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResultsTableName', 'FBP-Weekly-Results-2025')
 logger.info(f"Using FBP Weekly Results DynamoDB table: {FBP_WEEKLY_RESULTS_TABLE}")
 
 @app.get("/resetDBs")

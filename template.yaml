@@ -10,21 +10,18 @@ Globals:
       Variables:
         POWERTOOLS_SERVICE_NAME: FBPService
 Parameters:
-  FBPUsersTableName:
+  Year:
     Type: String
-    Default: FBP-Users
-  FBPConfigTableName:
-    Type: String
-    Default: FBP-Config
-  FBPScheduleTableName:
-    Type: String
-    Default: 2025-Schedule
-  FBPPicksTableName:
-    Type: String
-    Default: FBP-Picks
-  FBPLogsTableName:
-    Type: String
-    Default: 2025-Log
+    Default: "2026"
+  # FBPUsersTableName:
+  #   Type: String
+  #   Default: FBP-Users
+  # FBPScheduleTableName:
+  #   Type: String
+  #   Default: 2025-Schedule
+  # FBPPicksTableName:
+  #   Type: String
+  #   Default: FBP-Picks
   # This is the original weekly results table.
   # After coding for a new table, this can be removed.
   FBPWeeklyResultsTableName:
@@ -34,18 +31,18 @@ Parameters:
   # It uses a Global Secondary Index on WeekIndex to make it easier to query by week.
   # It will replace the original FBPWeeklyResultsTableName after
   # we verify the new one is working correctly and update all code to use it.
-  FBPWeeklyResults2025TableName:
-    Type: String
-    Default: FBP-Weekly-Results-2025
+  # FBPWeeklyResults2025TableName:
+  #   Type: String
+  #   Default: FBP-Weekly-Results-2025
   FBPTeamRecordsTableName:
     Type: String
     Default: 2025-Record
-  TwilioOptOutTableName:
-    Type: String
-    Default: FBP-SMS-Opt-Outs
-  FBPPayoutLedgerTableName:
-    Type: String
-    Default: FBP-Payout-Ledger
+  # TwilioOptOutTableName:
+  #   Type: String
+  #   Default: FBP-SMS-Opt-Outs
+  # FBPPayoutLedgerTableName:
+  #   Type: String
+  #   Default: FBP-Payout-Ledger
   CloudFrontDomain:
     Type: String
     Default: my-fbp.com
@@ -56,9 +53,9 @@ Parameters:
     Type: String
     Default: WeekIndex
   # This is the GSI on the new weekly results table to make it easier to query by week.
-  FBPWeeklyResults2025WeekIndexName:
-    Type: String
-    Default: WeekIndex
+  # FBPWeeklyResults2025WeekIndexName:
+  #   Type: String
+  #   Default: WeekIndex
   S3BucketName:
     Type: String
     Default: my-fbp.com
@@ -107,7 +104,385 @@ Parameters:
     Type: String
     Description: ID of the Bedrock data source
     Default: LULFE6CQPM
+
 Resources:
+  FBPHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowHeaders:
+          - content-type
+          - x-amz-date
+          - authorization
+          - x-api-key
+          - x-amz-security-token
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        AllowOrigins:
+          - "*"
+        MaxAge: 300
+  MyApiMapping:          # ← add it here, same level as everything else
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName: my-fbp.com
+      ApiId: !Ref FBPHttpApi
+      Stage: !Ref FBPHttpApiprodStage
+  ##
+  # DB tables
+  ##
+  DynamoDBLogsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-Log"
+      TableClass: STANDARD
+
+      # Key Schema
+      AttributeDefinitions:
+        - AttributeName: level
+          AttributeType: S   # String
+        - AttributeName: timestamp
+          AttributeType: S   # String
+      KeySchema:
+        - AttributeName: level
+          KeyType: HASH      # Partition Key
+        - AttributeName: timestamp
+          KeyType: RANGE     # Sort Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      # DynamoDB Streams
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+      # Deletion Protection (set to true to prevent accidental deletion)
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery (disabled to match original, enable if needed)
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+      # Tags (add any tags here as needed)
+      # Tags:
+      #   - Key: Environment
+      #     Value: Production
+  DynamoDBFBPUsersTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-FBP-Users"
+      TableClass: STANDARD
+
+      # Key Schema (Partition Key only - no Sort Key)
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S   # String
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH      # Partition Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+  DynamoDBScheduleTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-Schedule"
+      TableClass: STANDARD
+
+      # Key Schema
+      AttributeDefinitions:
+        - AttributeName: Week
+          AttributeType: N   # Number
+        - AttributeName: GameId
+          AttributeType: S   # String
+      KeySchema:
+        - AttributeName: Week
+          KeyType: HASH      # Partition Key
+        - AttributeName: GameId
+          KeyType: RANGE     # Sort Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+  DynamoDBFBPConfigTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-FBP-Config"
+      TableClass: STANDARD
+
+      # Key Schema (Partition Key only - no Sort Key)
+      AttributeDefinitions:
+        - AttributeName: Week
+          AttributeType: N   # Number
+      KeySchema:
+        - AttributeName: Week
+          KeyType: HASH      # Partition Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+  DynamoDBFBPPicksTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-FBP-Picks"
+      TableClass: STANDARD
+
+      # Key Schema (Partition Key only - no Sort Key)
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S   # String
+        - AttributeName: Week
+          AttributeType: N   # Number
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH      # Partition Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Global Secondary Index
+      GlobalSecondaryIndexes:
+        - IndexName: WeekIndex
+          KeySchema:
+            - AttributeName: Week
+              KeyType: HASH  # GSI Partition Key
+          Projection:
+            ProjectionType: ALL  # All attributes projected
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+  DynamoDBFBPSMSOptOutsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-FBP-SMS-Opt-Outs"
+      TableClass: STANDARD
+
+      # Key Schema (Partition Key only - no Sort Key)
+      AttributeDefinitions:
+        - AttributeName: phone_number
+          AttributeType: S   # String
+      KeySchema:
+        - AttributeName: phone_number
+          KeyType: HASH      # Partition Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+  DynamoDBFBPWeeklyResultsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-FBP-Weekly-Results"
+      TableClass: STANDARD
+
+      # Key Schema (Partition Key only - no Sort Key)
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S   # String
+        - AttributeName: Week
+          AttributeType: N   # Number
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH      # Partition Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Global Secondary Index
+      GlobalSecondaryIndexes:
+        - IndexName: WeekIndex
+          KeySchema:
+            - AttributeName: Week
+              KeyType: HASH  # GSI Partition Key
+          Projection:
+            ProjectionType: ALL  # All attributes projected
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  DynamoDBFBPPayoutLedgerTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-FBP-Payout-Ledger"
+      TableClass: STANDARD
+
+      # Key Schema
+      AttributeDefinitions:
+        - AttributeName: RecordType
+          AttributeType: S   # String
+        - AttributeName: Timestamp
+          AttributeType: S   # String
+      KeySchema:
+        - AttributeName: RecordType
+          KeyType: HASH      # Partition Key
+        - AttributeName: Timestamp
+          KeyType: RANGE     # Sort Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - my-fbp.com
+          - www.my-fbp.com
+        Origins:
+          - Id: S3WebsiteOrigin
+            DomainName: my-fbp.com.s3-website-us-east-1.amazonaws.com
+            CustomOriginConfig:
+              HTTPPort: 80
+              OriginProtocolPolicy: http-only
+          - Id: ApiGatewayOrigin
+            DomainName: !Sub "${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+        DefaultCacheBehavior:
+          TargetOriginId: S3WebsiteOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          AllowedMethods: [GET, HEAD]
+        CacheBehaviors:
+          - PathPattern: /prod/*
+            TargetOriginId: ApiGatewayOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+        ViewerCertificate:
+          AcmCertificateArn: arn:aws:acm:us-east-1:768286545465:certificate/f93ac44f-bcd3-4ab9-95b0-c22d185f9259
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        # WebACLId: arn:aws:wafv2:us-east-1:768286545465:global/webacl/CreatedByCloudFront-66e05333/dbf250cb-7899-4d67-b067-8da1024f4266
+        Enabled: true
+        HttpVersion: http2
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+
+  # Route 53 A Record
+  Route53ARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: my-fbp.com.
+      Name: my-fbp.com.
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront hosted zone ID (always this value)
+        EvaluateTargetHealth: false
+
+  # Route 53 AAAA Record (IPv6)
+  Route53AAAARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: my-fbp.com.
+      Name: my-fbp.com.
+      Type: AAAA
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
   FBPLibLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
@@ -138,25 +513,25 @@ Resources:
         - !Ref TwilioLayer
       Environment:
         Variables:
-          TwilioOptOutTableName: !Ref TwilioOptOutTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          TwilioOptOutTableName: !Sub "${Year}-FBP-SMS-Opt-Outs"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref TwilioOptOutTableName
+            TableName: !Sub "${Year}-FBP-SMS-Opt-Outs"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Events:
         TwilioWebHookPost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /twilio-webhook
             Method: post
             PayloadFormatVersion: '2.0'
         TwilioWebHookOptionsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /twilio-webhook
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -202,14 +577,14 @@ Resources:
         HTMLtoPDFPostApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /htmlToPdf
             Method: post
             PayloadFormatVersion: '2.0'
         HTMLtoPDFOptionsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /htmlToPdf
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -251,7 +626,7 @@ Resources:
         ChatBotPostApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /chatbot
             Method: post
             PayloadFormatVersion: '2.0'
@@ -269,24 +644,24 @@ Resources:
           KnowledgeBaseId: !Ref KnowledgeBaseId
           DataSourceId: !Ref DataSourceId
           S3BucketName: !Ref S3BucketName
-          FBPScheduleTableName: !Ref FBPScheduleTableName
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
 
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
         - Version: '2012-10-17'
           Statement:
             - Effect: Allow
@@ -321,14 +696,14 @@ Resources:
         ChatBotSyncPostApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /chatbotsync
             Method: post
             PayloadFormatVersion: '2.0'
         ChatBotSyncOptionsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /chatbotsync
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -344,25 +719,25 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Events:
         GetCurrentWeekPostApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getCurrentWeek
             Method: post
             PayloadFormatVersion: '2.0'
         GetCurrentWeekOptionsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getCurrentWeek
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -377,31 +752,31 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
           FBPTeamRecordsTableName: !Ref FBPTeamRecordsTableName
-          FBPScheduleTableName: !Ref FBPScheduleTableName
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
         - DynamoDBCrudPolicy:
             TableName: !Ref FBPTeamRecordsTableName
       Events:
         TeamRecordGetApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateTeamRecords
             Method: get
             PayloadFormatVersion: '2.0'
         TeamRecordOptionsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateTeamRecords
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -416,28 +791,28 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
           FBPTeamRecordsTableName: !Ref FBPTeamRecordsTableName
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
             TableName: !Ref FBPTeamRecordsTableName
       Events:
         GetTeamRecordsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getTeamRecords
             Method: get
             PayloadFormatVersion: '2.0'
         GetTeamRecordsOptionsApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getTeamRecords
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -452,41 +827,41 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPPayoutLedgerTableName: !Ref FBPPayoutLedgerTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPPayoutLedgerTableName: !Sub "${Year}-FBP-Payout-Ledger"
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPPayoutLedgerTableName
+            TableName: !Sub "${Year}-FBP-Payout-Ledger"
       Events:
         FBPLedgerGetApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getFBPLedger
             Method: get
             PayloadFormatVersion: '2.0'
         FBPLedgerPostDepositApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /deposit
             Method: post
             PayloadFormatVersion: '2.0'
         FBPLedgerPostPayoutApi:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /payout
             Method: post
             PayloadFormatVersion: '2.0'
@@ -501,17 +876,17 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPSchedule2025TableName: !Ref FBPScheduleTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
           S3BucketName: !Ref S3BucketName
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
         - Version: '2012-10-17'
           Statement:
             - Effect: Allow
@@ -543,15 +918,15 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
           SetPoolStatusOpen: !Ref SetPoolStatusOpen # Open pool for new week.
           CalcWeeklyResults: !Ref CalcWeeklyResults # Calc NFL Game Results for the week just ended.
           UpdateWeeklyResults: !Ref UpdateWeeklyResults # Update User results.
           ImportSpreadsAndFinalScores: !Ref ImportSpreadsAndFinalScores # Import spreads and final scores for the week.
           AdvancedMessagingService: !Ref AdvancedMessagingService # Send messages to users about new week and weekly results.
           SendEmail: !Ref SendEmail
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -566,11 +941,11 @@ Resources:
                 - !GetAtt SendEmail.Arn
                 - !GetAtt SetPoolStatusOpen.Arn
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
 
   ClosePool:
     Type: AWS::Serverless::Function
@@ -583,8 +958,8 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
           SetPoolStatusClosed: !Ref SetPoolStatusClosed # Close pool for the week. This is the last thing done.
           SaveFBPPicks: !Ref SaveFBPPicks # Validate user picks
           ##
@@ -605,21 +980,21 @@ Resources:
                 - !GetAtt ImportSpreadsAndFinalScores.Arn # Import spreads and final scores for the week.
                 - !GetAtt AdvancedMessagingService.Arn # Send messages to users about new week and weekly results.
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Events:
         ClosePoolGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /closePool
             Method: GET
             PayloadFormatVersion: '2.0'
         ClosePoolOPTIONS:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /closePool
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -715,12 +1090,12 @@ Resources:
                   - dynamodb:Query
                   - dynamodb:PutItem
                 Resource:
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${FBPUsersTableName}
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${FBPLogsTableName}
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TwilioOptOutTableName}
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${FBPConfigTableName}
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${FBPWeeklyResults2025TableName}
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${FBPWeeklyResults2025TableName}/index/${FBPWeeklyResults2025WeekIndexName}
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Users
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-Log
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-Twilio-Opt-Out
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Config
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Weekly-Results
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Weekly-Results/index/${FBPWeeklyResultsWeekIndexName}
 
         - PolicyName: XRayPolicy
           PolicyDocument:
@@ -750,14 +1125,14 @@ Resources:
         AdvancedMessagingServicePost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /advanced-messaging
             Method: POST
             PayloadFormatVersion: '2.0'
         AdvancedMessagingServiceOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /advanced-messaging
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -767,9 +1142,9 @@ Resources:
           COMPANY_NAME: !Ref CompanyName
           BASE_URL: !Ref BaseUrl
           SUPPORT_EMAIL: !Ref SupportEmail
-          FBPUSERS_TABLE_NAME: !Ref FBPUsersTableName
-          FBPLOGS_TABLE_NAME: !Ref FBPLogsTableName
-          TWILIO_OPT_OUT_TABLE_NAME: !Ref TwilioOptOutTableName
+          FBPUSERS_TABLE_NAME: !Sub "${Year}-FBP-Users"
+          FBPLOGS_TABLE_NAME: !Sub "${Year}-Log"
+          TWILIO_OPT_OUT_TABLE_NAME: !Sub "${Year}-Twilio-Opt-Outs"
           TWILIO_CREDENTIALS_SECRET_ARN: !Ref TwilioCredentialsSecretArn
           POWERTOOLS_SERVICE_NAME: messaging-service
           POWERTOOLS_LOG_LEVEL: INFO
@@ -825,14 +1200,14 @@ Resources:
         AdvancedSMSServicePost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /advanced-sms
             Method: POST
             PayloadFormatVersion: '2.0'
         GetUserStatusOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /advanced-sms
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -844,9 +1219,9 @@ Resources:
           COMPANY_NAME: !Ref CompanyName
           BASE_URL: !Ref BaseUrl
           SUPPORT_EMAIL: !Ref SupportEmail
-          FBPUSERS_TABLE_NAME: !Ref FBPUsersTableName
-          FBPLOGS_TABLE_NAME: !Ref FBPLogsTableName
-          TWILIO_OPT_OUT_TABLE_NAME: !Ref TwilioOptOutTableName
+          FBPUSERS_TABLE_NAME: !Sub "${Year}-FBP-Users"
+          FBPLOGS_TABLE_NAME: !Sub "${Year}-Log"
+          TWILIO_OPT_OUT_TABLE_NAME: !Sub "${Year}-Twilio-Opt-Outs"
           TWILIO_CREDENTIALS_SECRET_ARN: !Ref TwilioCredentialsSecretArn
           # Powertools configuration
           POWERTOOLS_SERVICE_NAME: email-service
@@ -903,14 +1278,14 @@ Resources:
         AdvancedEmailServicePost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /advanced-email
             Method: POST
             PayloadFormatVersion: '2.0'
         GetUserStatusOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /advanced-email
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -921,8 +1296,8 @@ Resources:
           COMPANY_NAME: !Ref CompanyName
           BASE_URL: !Ref BaseUrl
           SUPPORT_EMAIL: !Ref SupportEmail
-          FBPUSERS_TABLE_NAME: !Ref FBPUsersTableName
-          FBPLOGS_TABLE_NAME: !Ref FBPLogsTableName
+          FBPUSERS_TABLE_NAME: !Sub "${Year}-FBP-Users"
+          FBPLOGS_TABLE_NAME: !Sub "${Year}-Log"
 
           # Powertools configuration
           POWERTOOLS_SERVICE_NAME: email-service
@@ -968,10 +1343,10 @@ Resources:
                   - dynamodb:UpdateItem
                   - dynamodb:DeleteItem
                 Resource:
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FBP-Config
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/2025-Log
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FBP-Users
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FBP-Weekly-Results-2025
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Config
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-Log
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Users
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Weekly-Results
 
   SMSValidationUtils:
     Type: AWS::Serverless::Function
@@ -982,9 +1357,9 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - Statement:
             - Effect: Allow
               Action:
@@ -992,8 +1367,8 @@ Resources:
               Resource: !Ref TwilioCredentialsSecretArn
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
           TWILIO_CREDENTIALS_SECRET_ARN: !Ref TwilioCredentialsSecretArn
       Layers:
         - !Ref FBPLibLayer
@@ -1002,42 +1377,42 @@ Resources:
         StoreSMSVerificationCodePost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /storeSMSVerificationCode
             Method: POST
             PayloadFormatVersion: '2.0'
         StoreSMSVerificationCodeOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /storeSMSVerificationCode
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
         GetSMSVerificationCodePost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getSMSVerificationCode
             Method: POST
             PayloadFormatVersion: '2.0'
         GetSMSVerificationCodeOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getSMSVerificationCode
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
         UpdateSMSVerificationPost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateSMSVerification
             Method: POST
             PayloadFormatVersion: '2.0'
         UpdateSMSVerificationOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateSMSVerification
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1050,30 +1425,30 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Layers:
         - !Ref FBPLibLayer
       Events:
         GetUserStatusPost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getUserStatus
             Method: POST
             PayloadFormatVersion: '2.0'
         GetUserStatusOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getUserStatus
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1088,25 +1463,25 @@ Resources:
         - !Ref FBPLibLayer
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
       Environment:
         Variables:
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Events:
         QueryFBPLogsPost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /queryFBPLogs
             Method: POST
             PayloadFormatVersion: '2.0'
         QueryFBPLogsOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /queryFBPLogs
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1121,28 +1496,28 @@ Resources:
         - !Ref FBPLibLayer
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
       Environment:
         Variables:
-          FBPScheduleTableName: !Ref FBPScheduleTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Events:
         GetScheduleGet:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getschedule
             Method: GET
             PayloadFormatVersion: '2.0'
         GetScheduleOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getschedule
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1156,34 +1531,34 @@ Resources:
         - !Ref FBPLibLayer
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
       Environment:
         Variables:
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPUsersTableName: !Ref FBPUsersTableName
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
 
       Events:
         ResetDBsGet:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /resetDBs
             Method: GET
             PayloadFormatVersion: '2.0'
         ResetDBsOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /resetDBs
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1196,13 +1571,13 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
       Environment:
         Variables:
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
       # SES stuff
       Role: !GetAtt SendEmailRole.Arn
 
@@ -1212,14 +1587,14 @@ Resources:
         SendEmailPost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /sendEmail
             Method: POST
             PayloadFormatVersion: '2.0'
         SendEmailOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /sendEmail
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1232,31 +1607,31 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
 
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Layers:
         - !Ref FBPLibLayer
       Events:
         GetStandingsGet:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getStandings
             Method: GET
             PayloadFormatVersion: '2.0'
         GetStandingsOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getStandings
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1269,31 +1644,31 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
 
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Layers:
         - !Ref FBPLibLayer
       Events:
         GetListForEmailPost:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getListForEmail
             Method: GET
             PayloadFormatVersion: '2.0'
         GetListForEmailOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getListForEmail
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1306,28 +1681,28 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
 
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Layers:
         - !Ref FBPLibLayer
       Events:
         GetFBPEmailAndDisplayNameGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getFBPUserEmailAndDisplayName
             Method: GET
             PayloadFormatVersion: '2.0'
         GetFBPEmailAndDisplayNameOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getFBPUserEmailAndDisplayName
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1339,28 +1714,28 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
 
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Layers:
         - !Ref FBPLibLayer
       Events:
         GetAllFBPEmailAndDisplayNameGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getAllFBPUserEmailAndDisplayName
             Method: GET
             PayloadFormatVersion: '2.0'
         GetAllFBPEmailAndDisplayNameOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getAllFBPUserEmailAndDisplayName
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1373,53 +1748,53 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub 
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
-          FBPScheduleTableName: !Ref FBPScheduleTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
       Layers:
         - !Ref FBPLibLayer
       Events:
         UpdateWeeklyResultsGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateWeeklyResults
             Method: GET
             PayloadFormatVersion: '2.0'
         UpdateWeeklyResultsOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateWeeklyResults
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
         UpdateTotalCorrectAndIncorrectPicksGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateTotalCorrectAndIncorrectPicks
             Method: GET
             PayloadFormatVersion: '2.0'
         UpdateTotalCorrectAndIncorrectPicksOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateTotalCorrectAndIncorrectPicks
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1433,36 +1808,36 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPScheduleTableName: !Ref FBPScheduleTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
       Layers:
         - !Ref FBPLibLayer
       Events:
         CalcWeeklyResultsGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /calcWeeklyResults
             Method: GET
             PayloadFormatVersion: '2.0'
         CalcWeeklyResultsOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /calcWeeklyResults
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1475,39 +1850,38 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPWeeklyResultsTableName
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPWeeklyResults2025TableName
+            TableName: !Sub 
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPWeeklyResultsTableName: !Ref FBPWeeklyResultsTableName
-          FBPWeeklyResults2025TableName: !Ref FBPWeeklyResults2025TableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
       Layers:
         - !Ref FBPLibLayer
       Events:
         GetWeeklyResultsGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getWeeklyResults
             Method: GET
             PayloadFormatVersion: '2.0'
         GetWeeklyResultsOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getWeeklyResults
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1522,49 +1896,49 @@ Resources:
       Tracing: Active
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPUsersTableName: !Ref FBPUsersTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
       Layers:
         - !Ref FBPLibLayer
       Events:
         SaveFBPPicksPOST:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /saveFBPPicks
             Method: POST
             PayloadFormatVersion: '2.0'
         SaveFBPPicksOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /saveFBPPicks
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
         ValidateAndFixFBPPicksPOST:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /validateAndFixFBPPicks
             Method: POST
             PayloadFormatVersion: '2.0'
         ValidateAndFixFBPPicksOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /validateAndFixFBPPicks
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1578,30 +1952,30 @@ Resources:
       MemorySize: 1024
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPScheduleTableName
+            TableName: !Sub "${Year}-Schedule"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPScheduleTableName: !Ref FBPScheduleTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
       Layers:
         - !Ref FBPLibLayer
       Events:
         GetPickSheetGET:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getPickSheet
             Method: GET
             PayloadFormatVersion: '2.0'
         GetPickSheetOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getPickSheet
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1614,26 +1988,26 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Layers:
         - !Ref FBPLibLayer
       Events:
         GetPoolOpen:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getPoolOpen
             Method: GET
         GetPoolOpenOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getPoolOpen
             Method: OPTIONS
   GetPoolConfig:
@@ -1644,15 +2018,15 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Events:
         GetPoolConfig:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getPoolConfig
             Method: GET
 
@@ -1687,27 +2061,27 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Layers:
         - !Ref FBPLibLayer
       Events:
         SetPoolStatusOpenPOST:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /setPoolStatusOpen
             Method: POST
             PayloadFormatVersion: '2.0'
         SetPoolStatusOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /setPoolStatusOpen
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1721,27 +2095,27 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPLogsTableName: !Sub "${Year}-Log"
       Layers:
         - !Ref FBPLibLayer
       Events:
         SetPoolStatusClosedPOST:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /setPoolStatusClosed
             Method: POST
             PayloadFormatVersion: '2.0'
         SetPoolStatusClosedOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /setPoolStatusClosed
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
@@ -1754,21 +2128,21 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Events:
         GetFBPUser:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getFBPUserPython
             Method: POST
             PayloadFormatVersion: '2.0'
@@ -1783,24 +2157,24 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
       Events:
         UpdateFBPUserPython:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /updateFBPUser
             Method: POST
             PayloadFormatVersion: '2.0'
@@ -1815,24 +2189,24 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Events:
         AddFBPUser:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /addFBPUser
             Method: POST
             PayloadFormatVersion: '2.0'
@@ -1847,23 +2221,23 @@ Resources:
       Runtime: python3.12
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
       Environment:
         Variables:
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Layers:
         - !Ref FBPLibLayer
       Events:
         GetFBPPicks:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getFBPPicksPython
             Method: POST
             PayloadFormatVersion: '2.0'
@@ -1878,36 +2252,36 @@ Resources:
         - !Ref FBPLibLayer
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPPicksTableName
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPLogsTableName
+            TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPUsersTableName
+            TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBReadPolicy:
-            TableName: !Ref FBPConfigTableName
+            TableName: !Sub "${Year}-FBP-Config"
         - Statement:
             - Effect: Allow
               Action: lambda:InvokeFunction
               Resource: !GetAtt GetPoolConfig.Arn
       Environment:
         Variables:
-          FBPPicksTableName: !Ref FBPPicksTableName
-          FBPLogsTableName: !Ref FBPLogsTableName
-          FBPUsersTableName: !Ref FBPUsersTableName
-          FBPConfigTableName: !Ref FBPConfigTableName
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
           GET_POOL_CONFIG_FUNCTION: !Ref GetPoolConfig
       Events:
         GetAllFBPPicks:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getAllFBPPicks
             Method: GET
             PayloadFormatVersion: '2.0'
         GetAllFBPPicksOptions:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
+            ApiId: !Ref FBPHttpApi
             Path: /getAllFBPPicks
             Method: OPTIONS
 
@@ -1919,12 +2293,12 @@ Resources:
 Outputs:
   HttpAPiUrl:
     Description: URL of the HTTP API gateway
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/
     Export:
       Name: !Sub ${AWS::StackName}-HttpApiUrl
   HttpApiId:
     Description: HTTP API ID
-    Value: !Ref MyHttpApi
+    Value: !Ref FBPHttpApi
     Export:
       Name: !Sub ${AWS::StackName}-HttpApiId
   HtmlToPdfFunctionName:
@@ -1934,7 +2308,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-HtmlToPdf
   HtmlToPdfEndpoint:
     Description: Endpoint for the HtmlToPdf API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/htmlToPdf
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/htmlToPdf
     Export:
       Name: !Sub ${AWS::StackName}-HtmlToPdfEndpoint
   ChatBotFunctionName:
@@ -1944,7 +2318,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-ChatBot
   ChatBotEndpoint:
     Description: Endpoint for the ChatBot API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/chatbot
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/chatbot
     Export:
       Name: !Sub ${AWS::StackName}-ChatBotEndpoint
   ChatBotSyncFunctionName:
@@ -1954,7 +2328,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-ChatBotSync
   ChatBotSyncEndpoint:
     Description: Endpoint for the ChatBotSync API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/chatbotsync
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/chatbotsync
     Export:
       Name: !Sub ${AWS::StackName}-ChatBotSyncEndpoint
   ImportSpreadsAndFinalScoresFunctionName:
@@ -1964,7 +2338,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-ImportSpreadsAndFinalScores
   ImportSpreadsAndFinalScoresEndpoint:
     Description: Endpoint for the ImportSpreadsAndFinalScores API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/importSpreadsAndFinalScores
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/importSpreadsAndFinalScores
     Export:
       Name: !Sub ${AWS::StackName}-ImportSpreadsAndFinalScoresEndpoint
   AdvancedMessagingServiceFunctionName:
@@ -1974,7 +2348,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-AdvancedMessagingService
   AdvancedMessagingServiceEndpoint:
     Description: Endpoint for the AdvancedMessagingService API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/advanced-messaging
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/advanced-messaging
     Export:
       Name: !Sub ${AWS::StackName}-AdvancedMessagingEndpoint
   AdvancedSMSServiceFunctionName:
@@ -1986,7 +2360,7 @@ Outputs:
   AdvancedSMSServiceEndpoint:
     Description: Endpoint for the AdvancedSMSService API (retained until
       AdvancedMessagingService is verified)
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/advancedSMSService
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/advancedSMSService
     Export:
       Name: !Sub ${AWS::StackName}-AdvancedSMSEndpoint
   # TwilioWebhookFunctionName:
@@ -1996,7 +2370,7 @@ Outputs:
   #     Name: !Sub "${AWS::StackName}-twilio-webhook"
   TwilioWebhookEndpoint:
     Description: Endpoint for the TwilioWebhook API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/twilio-webhook
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/twilio-webhook
     Export:
       Name: !Sub ${AWS::StackName}-twilio-webhook-endpoint
   SMSVerificationFunctionName:
@@ -2006,22 +2380,22 @@ Outputs:
       Name: !Sub ${AWS::StackName}-SMSVerificationCodeFunctionName
   SMSStoreVerificationCodeEndpoint:
     Description: Endpoint for sending SMS verification codes
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/storeSMSVerificationCode
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/storeSMSVerificationCode
     Export:
       Name: !Sub ${AWS::StackName}-SMSStoreVerificationCodeEndpoint
   SMSGetVerificationCodeEndpoint:
     Description: Endpoint for sending SMS verification codes
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getSMSVerificationCode
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getSMSVerificationCode
     Export:
       Name: !Sub ${AWS::StackName}-SMSGetVerificationCodeEndpoint
   SMSUpdateVerificationCodeEndpoint:
     Description: Endpoint for updating SMS verification status
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/updateSMSVerification
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/updateSMSVerification
     Export:
       Name: !Sub ${AWS::StackName}-SMSUpdateVerificationCodeEndpoint
   GetTeamRecordsEndpoint:
     Description: Endpoint for the GetTeamRecords API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getTeamRecords
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getTeamRecords
     Export:
       Name: !Sub ${AWS::StackName}-GetTeamRecordsEndpoint
   FBPPayoutLedgerFunctionName:
@@ -2032,22 +2406,22 @@ Outputs:
   # API endpoints (add these)
   FBPLedgerApiBaseUrl:
     Description: Base URL of the FBP Ledger API
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
       Name: !Sub ${AWS::StackName}-FBPLedgerApiBaseUrl
 
   # Optional: Specific endpoint URLs for convenience
   FBPLedgerGetEndpoint:
     Description: GET endpoint for FBP Ledger
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getFBPLedger
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getFBPLedger
 
   FBPLedgerDepositEndpoint:
     Description: POST endpoint for deposits
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/deposit
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/deposit
 
   FBPLedgerPayoutEndpoint:
     Description: POST endpoint for payouts
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/payout
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/payout
   GetUserStatusFunctionName:
     Description: Name of the GetUserStatus Lambda function
     Value: !Ref GetUserStatus
@@ -2055,7 +2429,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-GetUserStatusFunctionName
   GetUserStatusApi:
     Description: URL of the GetUserStatus API endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getUserStatus
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getUserStatus
     Export:
       Name: !Sub ${AWS::StackName}-GetUserStatusApi
   GetScheduleFunctionName:
@@ -2065,7 +2439,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-GetScheduleFunctionName
   GetScheduleApi:
     Description: URL of the GetSchedule API endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getschedule
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getschedule
     Export:
       Name: !Sub ${AWS::StackName}-GetScheduleApi
   QueryFBPLogsFunctionName:
@@ -2075,7 +2449,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-QueryFBPLogsFunctionName
   QueryFBPLogsApi:
     Description: URL of the QueryFBPLogs API endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/queryFBPLogs
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/queryFBPLogs
     Export:
       Name: !Sub ${AWS::StackName}-QueryFBPLogsApi
   EmailForwardingName:
@@ -2092,93 +2466,93 @@ Outputs:
   AdvancedEmailServiceApi:
     Description: URL of the Advanced Email Service API endpoint (retained until
       AdvancedMessagingService is verified)
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/advancedEmailService
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/advancedEmailService
     Export:
       Name: !Sub ${AWS::StackName}-AdvancedEmailServiceApi
   SendEmailApi:
     Description: SendEmail API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/sendEmail
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/sendEmail
     Export:
       Name: !Sub ${AWS::StackName}-SendEmailApi
 
   GetStandingsApi:
     Description: GetStandings API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getStandings
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getStandings
     Export:
       Name: !Sub ${AWS::StackName}-GetStandingsApi
   GetListForEmailApi:
     Description: GetListOfEmails API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getListForEmail
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getListForEmail
     Export:
       Name: !Sub ${AWS::StackName}-GetListForEmailApi
   GetAllFBPEmailAndDisplayNameApi:
     Description: GetAllFBPEmailAndDisplayName API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getAllFBPUserEmailAndDisplayName
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getAllFBPUserEmailAndDisplayName
     Export:
       Name: !Sub ${AWS::StackName}-GetAllFBPEmailAndDisplayNameApi
   GetFBPEmailAndDisplayNameApi:
     Description: GetFBPEmailAndDisplayName API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getFBPUserEmailAndDisplayName
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getFBPUserEmailAndDisplayName
     Export:
       Name: !Sub ${AWS::StackName}-GetFBPEmailAndDisplayNameApi
   GetWeeklyResultsApi:
     Description: GetWeeklyResults API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getWeeklyResults
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getWeeklyResults
     Export:
       Name: !Sub ${AWS::StackName}-GetWeeklyResultsApi
   CalcWeeklyResultsApi:
     Description: CalcWeeklyResults API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/calcWeeklyResults
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/calcWeeklyResults
     Export:
       Name: !Sub ${AWS::StackName}-CalcWeeklyResultsApi
   SaveFBPPicksApi:
     Description: SaveFBPPicks API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/saveFBPPicks
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/saveFBPPicks
     Export:
       Name: !Sub ${AWS::StackName}-SaveFBPPicksApi
   GetPickSheetApi:
     Description: GetPickSheet API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getPickSheetPython
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getPickSheetPython
     Export:
       Name: !Sub ${AWS::StackName}-GetPickSheetApi
   GetFBPPicksApi:
     Description: GetFBPPicks API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getFBPPicksPython
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getFBPPicksPython
     Export:
       Name: !Sub ${AWS::StackName}-GetFBPPicksApi
   GetPoolOpenApi:
     Description: GetPoolOpen API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getPoolOpen
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getPoolOpen
     Export:
       Name: !Sub ${AWS::StackName}-GetPoolOpenApi
 
   SetPoolStatusOpenApi:
     Description: SetPoolStatusOpen API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/setPoolStatusOpen
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/setPoolStatusOpen
     Export:
       Name: !Sub ${AWS::StackName}-SetPoolStatusApi
   SetPoolStatusClosedApi:
     Description: SetPoolStatusClosed API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/setPoolStatusClosed
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/setPoolStatusClosed
     Export:
       Name: !Sub ${AWS::StackName}-SetPoolStatusClosedApi
   GetFBPUserEndpoint:
     Description: GetFBPUser API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/getFBPUserPython
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/getFBPUserPython
     Export:
       Name: !Sub ${AWS::StackName}-GetFBPUserHttpApi
   GetAllFBPPicksEndpoint:
     Description: GetAllFBPPicks API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getAllFBPPicks
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getAllFBPPicks
     Export:
       Name: !Sub ${AWS::StackName}-GetAllFBPPicksHttpApi
   UpdateFBPUserPythonEndpoint:
     Description: UpdateFBPUserPython API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/updateFBPUser
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/updateFBPUser
     Export:
       Name: !Sub ${AWS::StackName}-AddOrUpdateFBPUserPythonHttpApi
   AddFBPUserEndpoint:
     Description: AddFBPUser API Endpoint
-    Value: !Sub https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/addFBPUser
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/addFBPUser
     Export:
       Name: !Sub ${AWS::StackName}-AddFBPUserHttpApi

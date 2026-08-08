@@ -168,7 +168,7 @@ def sendTemplatedEmail():
             week = getCurrentWeek()
             # query the FBP-Weekly-Results-2025 table for winner=true
             FBPWeeklyResultsTableName = os.environ.get(
-                "FBPWeeklyResults2025TableName", "FBP-Weekly-Results-2025"
+                "FBPWeeklyResultsTableName", "FBP-Weekly-Results-2025"
             )
             resultsTable = boto3.resource("dynamodb").Table(FBPWeeklyResultsTableName)
             winner = resultsTable.scan(

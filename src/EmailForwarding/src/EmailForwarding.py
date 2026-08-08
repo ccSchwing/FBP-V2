@@ -10,7 +10,7 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 import logging
-from fbplib import fbpLog
+from fbplib.fbpLog import fbpLog
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -23,6 +23,9 @@ def lambda_handler(event, context):
     logger.info(f"Forwarding to: {FORWARD_TO_EMAIL}")
     logger.info(f"Forwarding from: {FROM_EMAIL}")
     my_bucket = os.environ.get('SESBucketName')
+    if not my_bucket:
+        raise ValueError("SESBucketName environment variable is not set")
+    
     S3_REGION='us-east-1' 
     s3_client = boto3.client('s3', region_name=S3_REGION)
     ses_client = boto3.client('ses', region_name=S3_REGION)
