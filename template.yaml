@@ -24,9 +24,9 @@ Parameters:
   #   Default: FBP-Picks
   # This is the original weekly results table.
   # After coding for a new table, this can be removed.
-  FBPWeeklyResultsTableName:
-    Type: String
-    Default: FBP-Weekly-Results
+  # FBPWeeklyResultsTableName:
+  #   Type: String
+  #   Default: FBP-Weekly-Results
   # This is the new weekly results table that will be used going forward.
   # It uses a Global Secondary Index on WeekIndex to make it easier to query by week.
   # It will replace the original FBPWeeklyResultsTableName after
