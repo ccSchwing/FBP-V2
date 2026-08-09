@@ -1,7 +1,6 @@
 import json
 import boto3
 import os
-import tempfile
 from weasyprint import HTML
 from botocore.client import Config as CORSConfig
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
