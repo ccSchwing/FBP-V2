@@ -49,15 +49,15 @@ def _is_opted_in(value: Any) -> bool:
         return value.strip().lower() in {"true", "1", "yes", "y", "on"}
     return False
 
-
+##
+# I think I fixed the issue with the week being off by one
+##
 def _get_winner() -> Optional[str]:
     """Get the weekly winner's email for the current week."""
     current_week = getCurrentWeek()
     if current_week is None:
         logger.info("Current week is None; cannot get winner")
         return None
-    else:
-        current_week = current_week - 1  # Adjust to get the previous week
     winners_table_name = os.environ.get('FBPWeeklyResultsTableName', default='FBP-Weekly-Results-2025')
     if not winners_table_name:
         logger.info("FBPWeeklyResultsTableName not set; cannot get winner")
@@ -358,6 +358,12 @@ class EmailService:
     def _picksheet_content(self, data: Dict[str, Any]) -> tuple:
         user_name = data.get('user_name', 'User')
         week=getCurrentWeek()
+        if week is None:
+            raise ValueError("Current week could not be determined")
+        ##
+        # add one to the current week to get the correct week for picks
+        ##
+        week = week + 1
         subject = f"{self.company_name} Is Open for Picks for week {week}."
         html = f"""
         <html><body>
@@ -655,6 +661,9 @@ class SMSService:
     def _picksheet_content(self, data: Dict[str, Any]) -> str:
         user_name = data.get('user_name', 'User')
         week=getCurrentWeek()
+        if week is None:
+            raise ValueError("Current week could not be determined")
+        week = week + 1  # Adjust to get the correct week for picks
         return (f"Hi {user_name}, {self.company_name} Pool is open for week {week}. Make your picks!\n"
                 f"Visit {self.base_url}\n"
                 f"FAQ: {self.base_url}/faq.html")
