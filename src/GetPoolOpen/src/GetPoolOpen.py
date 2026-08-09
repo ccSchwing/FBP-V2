@@ -10,6 +10,7 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from fbplib.getCurrentWeek import getCurrentWeek
 from fbplib.fbpLog import fbpLog
+import os
 
 
 logger = logging.getLogger()
@@ -38,7 +39,18 @@ def getPoolStatus():
     # Initialize DynamoDB resource
     logger.info("Connecting to DynamoDB table FBP-Config")
     dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table('FBP-Config')
+    year=os.getenv('Year')
+    if not year:
+        fbpLog("fbpadmin@my-fbp.com", "GetPoolOpenEvent", "Year environment variable is not set.", "ERROR")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({
+                'error': 'Year environment variable is not set.',
+                'pool_open': False
+            })
+        }
+    FBPConfigTableName = f"{year}-FBP-Config"
+    table = dynamodb.Table(FBPConfigTableName)
     try:
         week_number = getCurrentWeek()
         if week_number is None:
