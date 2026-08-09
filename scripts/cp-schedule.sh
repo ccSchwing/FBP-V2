@@ -6,6 +6,8 @@ set -e
 AWS_PROFILE="${AWS_PROFILE:-ccs}"
 export AWS_PROFILE
 
+YEAR="2026"
+
 require_aws_credentials() {
 	if ! aws sts get-caller-identity --profile "$AWS_PROFILE" >/dev/null 2>&1
 	then
@@ -26,7 +28,7 @@ fi
 require_aws_credentials
 
 BUCKET="my-fbp.com"
-SCHED_DIR="../schedule/2025-Schedule"
+SCHED_DIR="../schedule/${YEAR}-Schedule"
 
 ls -l ${SCHED_DIR}
 
@@ -35,10 +37,10 @@ cd $SCHED_DIR
 if [ -f $schedFile ]
 then
 	echo "Running aws cp on $schedFile to $BUCKET"
-	aws s3 cp $schedFile s3://$BUCKET/schedule/2025-Schedule/$schedFile
+	aws s3 cp $schedFile s3://$BUCKET/schedule/${YEAR}-Schedule/$schedFile
 	if [ $? -eq 0 ]
 	then
-		echo "$schedFile copied to s3 bucket: $BUCKET/schedule/2025-Schedule/$schedFile"
+		echo "$schedFile copied to s3 bucket: $BUCKET/schedule/${YEAR}-Schedule/$schedFile"
 		exit 0
 	else
 		echo "aws s3 cp failed."

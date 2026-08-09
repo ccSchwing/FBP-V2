@@ -34,9 +34,9 @@ Parameters:
   # FBPWeeklyResults2025TableName:
   #   Type: String
   #   Default: FBP-Weekly-Results-2025
-  FBPTeamRecordsTableName:
-    Type: String
-    Default: 2025-Record
+  # FBPTeamRecordsTableName:
+  #   Type: String
+  #   Default: 2025-Record
   # TwilioOptOutTableName:
   #   Type: String
   #   Default: FBP-SMS-Opt-Outs
@@ -419,6 +419,37 @@ Resources:
       # Point-in-Time Recovery
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+  DynamoDBFBPRecordTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${Year}-Record"
+      TableClass: STANDARD
+
+      # Key Schema (Partition Key only - no Sort Key)
+      AttributeDefinitions:
+        - AttributeName: TeamName
+          AttributeType: S   # String
+      KeySchema:
+        - AttributeName: TeamName
+          KeyType: HASH      # Partition Key
+
+      # Billing Mode
+      BillingMode: PAY_PER_REQUEST  # On-Demand
+
+      # Encryption at Rest
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
+
+      # Deletion Protection
+      DeletionProtectionEnabled: true
+
+      # Point-in-Time Recovery
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -754,7 +785,7 @@ Resources:
         Variables:
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
           FBPLogsTableName: !Sub "${Year}-Log"
-          FBPTeamRecordsTableName: !Ref FBPTeamRecordsTableName
+          DynamoDBFBPRecordTable: !Sub "${Year}-Record"
           FBPScheduleTableName: !Sub "${Year}-Schedule"
       Policies:
         - DynamoDBReadPolicy:
@@ -764,7 +795,7 @@ Resources:
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-Schedule"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPTeamRecordsTableName
+            TableName: !Sub "${Year}-Record"
       Events:
         TeamRecordGetApi:
           Type: HttpApi
@@ -793,14 +824,14 @@ Resources:
         Variables:
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
           FBPLogsTableName: !Sub "${Year}-Log"
-          FBPTeamRecordsTableName: !Ref FBPTeamRecordsTableName
+          DynamoDBFBPRecordTable: !Sub "${Year}-Record"
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
-            TableName: !Ref FBPTeamRecordsTableName
+            TableName: !Sub "${Year}-Record"
       Events:
         GetTeamRecordsApi:
           Type: HttpApi
@@ -880,6 +911,7 @@ Resources:
           FBPLogsTableName: !Sub "${Year}-Log"
           FBPScheduleTableName: !Sub "${Year}-Schedule"
           S3BucketName: !Ref S3BucketName
+          Year: !Ref Year
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-FBP-Config"
@@ -1995,6 +2027,7 @@ Resources:
         Variables:
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
           FBPLogsTableName: !Sub "${Year}-Log"
+          Year: !Ref Year
       Layers:
         - !Ref FBPLibLayer
       Events:
@@ -2022,6 +2055,7 @@ Resources:
       Environment:
         Variables:
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          Year: !Ref Year
       Events:
         GetPoolConfig:
           Type: HttpApi

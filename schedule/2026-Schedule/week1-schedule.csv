@@ -1,0 +1,17 @@
+GameId,Week,Date,Away,Home,AwayScore,HomeScore,Spread,Winner,Underdog
+W1-01,1,2026-08-13,Lions,Bengals,0,0,4.5,H or A,A
+W1-02,1,2026-08-13,Packers,Steelers,0,0,1.5,H or A,A
+W1-03,1,2026-08-13,Colts,Patriots,0,0,1.5,H or A,A
+W1-04,1,2026-08-13,Cardinals,Raiders,0,0,2.5,H or A,A
+W1-05,1,2026-08-13,Chargers,Texans,0,0,1.5,H or A,H
+W1-06,1,2026-08-13,Titans,49ers,0,0,2.5,H or A,H
+W1-07,1,2026-08-14,Broncos,Falcons,0,0,4.5,H or A,H
+W1-08,1,2026-08-14,Buccaneers,Jets,0,0,1.5,H or A,H
+W1-09,1,2026-08-14,Dolphins,Commanders,0,0,1.5,H or A,H
+W1-10,1,2026-08-15,Panthers,Bills,0,0,2.5,H or A,A
+W1-11,1,2026-08-15,Browns,Bears,0,0,1.5,H or A,A
+W1-12,1,2026-08-15,Vikings,Giants,0,0,2.5,H or A,H
+W1-13,1,2026-08-15,Rams,Chiefs,0,0,1.5,H or A,A
+W1-14,1,2026-08-15,Jaguars,Saints,0,0,1.5,H or A,H
+W1-15,1,2026-08-15,Eagles,Ravens,0,0,1.5,H or A,H
+W1-16,1,2026-08-15,Cowboys,Seahawks,0,0,2.5,H or A,A

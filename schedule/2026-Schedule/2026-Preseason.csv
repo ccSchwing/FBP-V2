@@ -1,0 +1,50 @@
+GameId,Week,Date,Away,Home,AwayScore,HomeScore,Spread,Winner,Underdog
+HOF,HOF,2026-08-06,Panthers,Cardinals,33,30,Panthers -1.5,Panthers,Cardinals
+W1-01,W1,2026-08-13,Lions,Bengals,,,Bengals -4.5,,Lions
+W1-02,W1,2026-08-13,Packers,Steelers,,,Steelers -1.5,,Packers
+W1-03,W1,2026-08-13,Colts,Patriots,,,Patriots -1.5,,Colts
+W1-04,W1,2026-08-13,Cardinals,Raiders,,,Raiders -2.5,,Cardinals
+W1-05,W1,2026-08-13,Chargers,Texans,,,Chargers -1.5,,Texans
+W1-06,W1,2026-08-13,Titans,49ers,,,Titans -2.5,,49ers
+W1-07,W1,2026-08-14,Broncos,Falcons,,,Broncos -4.5,,Falcons
+W1-08,W1,2026-08-14,Buccaneers,Jets,,,Buccaneers -1.5,,Jets
+W1-09,W1,2026-08-14,Dolphins,Commanders,,,Dolphins -1.5,,Commanders
+W1-10,W1,2026-08-15,Panthers,Bills,,,Bills -2.5,,Panthers
+W1-11,W1,2026-08-15,Browns,Bears,,,Bears -1.5,,Browns
+W1-12,W1,2026-08-15,Vikings,Giants,,,Vikings -2.5,,Giants
+W1-13,W1,2026-08-15,Rams,Chiefs,,,Chiefs -1.5,,Rams
+W1-14,W1,2026-08-15,Jaguars,Saints,,,Jaguars -1.5,,Saints
+W1-15,W1,2026-08-15,Eagles,Ravens,,,Eagles -1.5,,Ravens
+W1-16,W1,2026-08-15,Cowboys,Seahawks,,,Seahawks -2.5,,Cowboys
+W2-01,W2,2026-08-20,Raiders,Texans,,,,,
+W2-02,W2,2026-08-20,49ers,Chargers,,,,,
+W2-03,W2,2026-08-21,Jets,Steelers,,,,,
+W2-04,W2,2026-08-21,Panthers,Jaguars,,,,,
+W2-05,W2,2026-08-21,Packers,Broncos,,,,,
+W2-06,W2,2026-08-22,Commanders,Lions,,,,,
+W2-07,W2,2026-08-22,Bills,Browns,,,,,
+W2-08,W2,2026-08-22,Falcons,Colts,,,,,
+W2-09,W2,2026-08-22,Ravens,Vikings,,,,,
+W2-10,W2,2026-08-22,Saints,Rams,,,,,
+W2-11,W2,2026-08-22,Giants,Dolphins,,,,,
+W2-12,W2,2026-08-22,Bears,Bengals,,,,,
+W2-13,W2,2026-08-22,Eagles,Patriots,,,,,
+W2-14,W2,2026-08-22,Chiefs,Buccaneers,,,,,
+W2-15,W2,2026-08-22,Cowboys,Cardinals,,,,,
+W2-16,W2,2026-08-23,Seahawks,Titans,,,,,
+W3-01,W3,2026-08-27,Steelers,Bills,,,,,
+W3-02,W3,2026-08-27,Patriots,Browns,,,,,
+W3-03,W3,2026-08-27,49ers,Raiders,,,,,
+W3-04,W3,2026-08-27,Rams,Chargers,,,,,
+W3-05,W3,2026-08-28,Commanders,Ravens,,,,,
+W3-06,W3,2026-08-28,Falcons,Dolphins,,,,,
+W3-07,W3,2026-08-28,Texans,Panthers,,,,,
+W3-08,W3,2026-08-28,Giants,Jets,,,,,
+W3-09,W3,2026-08-28,Buccaneers,Jaguars,,,,,
+W3-10,W3,2026-08-28,Saints,Cowboys,,,,,
+W3-11,W3,2026-08-28,Cardinals,Packers,,,,,
+W3-12,W3,2026-08-28,Seahawks,Chiefs,,,,,
+W3-13,W3,2026-08-28,Bengals,Eagles,,,,,
+W3-14,W3,2026-08-28,Vikings,Broncos,,,,,
+W3-15,W3,2026-08-29,Lions,Colts,,,,,
+W3-16,W3,2026-08-29,Bears,Titans,,,,,
