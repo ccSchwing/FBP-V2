@@ -6,7 +6,7 @@
   "headers": {
     "content-type": "application/json"
   },
-  "body": "{\"question\": \"Cheifs\"}",
+  "body": "{\"html\": \"<html><head><link rel=\\\"stylesheet\\\" href=\\\"/css/styles.css\\\"></head><body><h1>Test PDF</h1></body></html>\", \"filename\": \"test.pdf\"}",
   
   "requestContext": {
     "routeKey": "POST /htmlToPdf",
