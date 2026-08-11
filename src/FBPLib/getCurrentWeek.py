@@ -8,7 +8,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 def getCurrentWeek():
-    FBP_CONFIG_TABLE_NAME = os.environ.get('FBPConfigTableName', 'FBP-Config')
+    FBP_CONFIG_TABLE_NAME = os.environ.get('FBPConfigTableName')
+    if not FBP_CONFIG_TABLE_NAME:
+        logger.error("FBPConfigTableName environment variable is not set.")
+        return None
     logger.info(f"Fetching current week from DynamoDB table: {FBP_CONFIG_TABLE_NAME}")
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table(FBP_CONFIG_TABLE_NAME)

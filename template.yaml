@@ -524,6 +524,7 @@ Resources:
         - python3.12
     Metadata:
       BuildMethod: python3.12
+
   TwilioLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
@@ -1094,6 +1095,13 @@ Resources:
                   - s3:GetObject
                 Resource:
                   - !Sub arn:aws:s3:::${SESBucketName}/*
+                  - !Sub arn:aws:s3:::${S3BucketName}/*
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${SESBucketName}
+                  - !Sub arn:aws:s3:::${S3BucketName}
         - PolicyName: SESPolicy
           PolicyDocument:
             Version: '2012-10-17'
@@ -1183,6 +1191,8 @@ Resources:
           POWERTOOLS_METRICS_NAMESPACE: MessagingService
           POWERTOOLS_TRACER_CAPTURE_RESPONSE: true
           POWERTOOLS_TRACER_CAPTURE_ERROR: true
+          YEAR: !Ref Year
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
 
   AdvancedSMSServiceRole:
     Type: AWS::IAM::Role
