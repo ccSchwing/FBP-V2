@@ -33,6 +33,7 @@ export function export2txt(picksData) {
 
 
 export function renderPickSheet(items) {
+  const domain="https://my-fbp.com"
   return items
     .filter(item => item && item.GameId && item.Away && item.Home && item.Underdog && item.Spread)
     .map((item, index) => {
@@ -52,10 +53,10 @@ export function renderPickSheet(items) {
           </label>
         </td>
         <td>
-          <img src="/images/${item.Away}.gif" data-pick="${item.GameId}A" class="pick-img pick-A" width="30" height="30" alt="${item.Away}">
+          <img src="${domain}/images/${item.Away}.gif" data-pick="${item.GameId}A" class="pick-img pick-A" width="30" height="30" alt="${item.Away}">
         </td>
         <td>
-          <img src="/images/${item.Home}.gif" data-pick="${item.GameId}H" class="pick-img pick-H" width="30" height="30" alt="${item.Home}">
+          <img src="${domain}/images/${item.Home}.gif" data-pick="${item.GameId}H" class="pick-img pick-H" width="30" height="30" alt="${item.Home}">
         </td>
         <td style="text-align:center" class="fa fa-align-center" aria-hidden="true">
           <label class="container">
@@ -124,8 +125,7 @@ export function renderPickSheetOrig(items) {
             <span class="checkmark"></span>
           </label>
         </td>
-        <!-- <td> <img src="/images/${item.Away}.gif" onclick="checkAwayTeam('${item.GameId}' +'A')" width="30" height="30"> -->
-        <td> <img src="/images/${item.Away}.gif")" id="${item.GameId}A" width="30" height="30">
+        <td> <img src="${domain}/images/${item.Away}.gif")" id="${item.GameId}A" width="30" height="30">
         <script>
           document.getElementById("${item.GameId}A").addEventListener("click", function() {
             if (document.getElementById("${item.GameId}A").checked) {
@@ -136,7 +136,7 @@ export function renderPickSheetOrig(items) {
           });
         </script>
         </td>
-        <td> <img src="/images/${item.Home}.gif" id="${item.GameId}H" width="30" height="30">
+        <td> <img src="${domain}/images/${item.Home}.gif" id="${item.GameId}H" width="30" height="30">
         <script>
           document.getElementById("${item.GameId}H").addEventListener("click", function() {
             if (document.getElementById("${item.GameId}H").checked) {

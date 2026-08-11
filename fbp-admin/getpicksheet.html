@@ -1,0 +1,591 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GetPickSheet</title>
+  <script src="/js-lib/oidc-client-ts.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+  <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+  <script type="module">
+    import { auth } from "/js/auth.js";
+    await auth.ensureAuthenticated();
+    const user = await auth.getUser();
+    if (user && user.profile && user.profile.email) {
+      window.userEmail = user.profile.email;
+    }
+    console.log("Authenticated user:", user);
+    window.user = user;
+    const { getUserStatus } = await import("/js-lib/userUtils.js");
+    await getUserStatus();
+  </script>
+  <style>
+    table th,
+    table td {
+      border: none;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 5px 10px;
+    }
+
+    table {
+      width: auto;
+      border-collapse: collapse;
+      margin-top: 8px;
+      margin-bottom: 8px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.13), 0 1.5px 4px rgba(76, 175, 80, 0.08);
+      border: 1.5px solid #c8e6c9;
+    }
+
+    #picksheet tbody tr {
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+
+    #picksheet tbody tr:hover {
+      background: rgba(76, 175, 80, 0.07) !important;
+      box-shadow: inset 3px 0 0 #4caf50;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    #picksheet table {
+      visibility: hidden;
+    }
+
+    #picksheet table th {
+      background-color: #4caf50;
+      color: white;
+      font-weight: bold;
+    }
+
+    #infoBanner {
+      display: visible;
+      margin: 8px 0 12px;
+      padding: 8px 10px;
+      border: 1px solid #0c5b63;
+      background: #fff9db;
+      color: #210c78;
+      font-size: 0.92rem;
+      width: fit-content;
+    }
+
+    #loadingSpinner {
+      display: none;
+      text-align: center;
+      margin: 2rem 0;
+    }
+
+    #loadingSpinner::after {
+      content: "";
+      display: inline-block;
+      width: 48px;
+      height: 48px;
+      border: 5px solid #ccc;
+      border-top-color: #4caf50;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+  <style>
+    /* Override page-title positioning to not cover menu button */
+    .page-title {
+      position: static;
+      transform: none;
+      left: auto;
+      width: 100vw;
+      max-width: 100%;
+      text-align: center;
+      margin-top: 2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .results-layout {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 2.5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .results-main {
+      flex: 1;
+      min-width: 320px;
+    }
+
+    .nav-choices {
+      min-width: 260px;
+      max-width: 320px;
+      margin-top: 0.5rem;
+    }
+
+    .nav-choices ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .nav-choices a {
+      text-decoration: none;
+      color: #1976d2;
+      font-weight: 500;
+      font-size: 1.08rem;
+      transition: color 0.2s;
+    }
+
+    .nav-choices a:hover {
+      color: #0d47a1;
+      text-decoration: underline;
+    }
+
+    .nav-right {
+      order: 2;
+      margin-left: 2.5rem;
+      margin-right: 0;
+    }
+
+    .results-main {
+      order: 1;
+    }
+
+    @media (max-width: 900px) {
+      .results-layout {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .nav-choices {
+        max-width: 100%;
+        margin-bottom: 1.5rem;
+        margin-left: 0;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .results-layout {
+        display: block;
+      }
+
+      .nav-choices {
+        display: none !important;
+      }
+
+      .container {
+        flex-direction: column !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="fbp-home">
+  <header>
+    <h1 class="page-title">Pick Sheet</h1>
+  </header>
+  <script>
+    function setInfoBanner(message = "") {
+      const bannerEl = document.getElementById("infoBanner");
+      if (!bannerEl) return;
+      if (!message) {
+        bannerEl.textContent = "";
+        bannerEl.style.display = "none";
+        return;
+      }
+      bannerEl.textContent = message;
+      bannerEl.style.display = "block";
+    }
+    function setDiagnostics(message = "") {
+      const bannerEl = document.getElementById("diagnosticsBanner");
+      if (!bannerEl) return;
+      if (!message) {
+        bannerEl.textContent = "";
+        bannerEl.style.display = "none";
+        return;
+      }
+      const traceId = new Date().toISOString().replace(/[\-:.TZ]/g, "").slice(0, 14);
+      bannerEl.textContent = `${message} (trace: ${traceId})`;
+      bannerEl.style.display = "block";
+    }
+  </script>
+
+  <div class="container" style="display:flex; gap:2rem; align-items:flex-start; margin:0; max-width:100%;">
+    <aside class="nav-choices">
+      <!-- populated by nav.js -->
+    </aside>
+    <main class="results-main">
+      <!-- <div class="callout">Current Week: <span id="current-week"></span></div> -->
+      <div id="infoBanner" aria-live="polite"></div>
+      <div id="loadingSpinner" aria-hidden="true" aria-label="Loading pick sheet..."></div>
+      <form id="picksheet" autocomplete="off">
+        <h2 id="poolStatus" style="text-align:center; margin-bottom:1rem;"></h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Pick</th>
+              <th>Away</th>
+              <th>Home</th>
+              <th>Pick</th>
+            </tr>
+          </thead>
+          <tbody id="picksBody">
+            <!-- Table rows will be rendered here by JS -->
+          </tbody>
+          <tr>
+            <td></td>
+            <td>TieBreaker</td>
+            <td>
+              <input type="text"
+                title="Enter the total combined score of the Monday Night Football game as a tiebreaker.  Valid range is 2 to 150"
+                aria-label="Monday Night Football Tie Breaker: Enter the total combined score of the Monday Night Football game. Valid range is 2 to 150"
+                size="2" id="mondayNightTieBreaker" name="mondayNightTieBreaker" />
+            </td>
+            <td></td>
+          </tr>
+        </table>
+      </form>
+      <div id="lastSavedContainer">
+        <h2 id="lastSavedAt" style="text-align:center; margin-bottom:1rem;"></h2>
+      </div>
+    </main>
+  </div>
+  <footer>
+    <p>
+      Questions? Contact us at <a href="mailto:fbpadmin@my-fbp.com">fbpadmin@my-fbp.com</a>
+    </p>
+    <p>&copy; 2026 FBP. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { getPicks, renderPickSheet } from "/js-lib/picksheetUtils.js";
+    import { getServiceUrl } from "/js-lib/urlConfig.js";
+    import { getCurrentWeek } from "/js-lib/fbpUtils.js";
+
+    function setLoadingSpinnerVisible(isVisible) {
+      const spinnerEl = document.getElementById("loadingSpinner");
+      const picksheetForm = document.getElementById("picksheet");
+      if (!spinnerEl) return;
+      spinnerEl.style.display = isVisible ? "block" : "none";
+      spinnerEl.setAttribute("aria-hidden", isVisible ? "false" : "true");
+      if (picksheetForm) {
+        picksheetForm.setAttribute("aria-busy", isVisible ? "true" : "false");
+      }
+    }
+
+    function formatSavedAt(savedAtValue) {
+      if (!savedAtValue) return "";
+      const date = new Date(savedAtValue);
+      if (Number.isNaN(date.getTime())) return "";
+      return date.toLocaleString();
+    }
+
+    function setLastSavedAt(savedAtValue) {
+      const lastSavedEl = document.getElementById("lastSavedAt");
+      if (!lastSavedEl) return;
+      const formatted = formatSavedAt(savedAtValue);
+      lastSavedEl.textContent = formatted ? `Last saved: ${formatted}` : "";
+    }
+
+    function renderPickSheetSkeleton(rowCount = 8) {
+      const rows = [];
+      for (let i = 0; i < rowCount; i += 1) {
+        rows.push(`
+              <tr>
+                <td class="skeleton-cell"><span class="skeleton-line" style="width: 96px;"></span></td>
+                <td class="skeleton-cell"><span class="skeleton-line" style="width: 132px;"></span></td>
+                <td class="skeleton-cell"><span class="skeleton-line" style="width: 132px;"></span></td>
+                <td class="skeleton-cell"><span class="skeleton-line" style="width: 70px;"></span></td>
+                <td class="skeleton-cell"><span class="skeleton-line" style="width: 44px;"></span></td>
+              </tr>
+            `);
+      }
+      return rows.join("");
+    }
+
+    function normalizeScheduleRows(payload) {
+      let parsed = payload;
+
+      if (typeof parsed === "string") {
+        parsed = JSON.parse(parsed);
+      }
+
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed) &&
+        "body" in parsed
+      ) {
+        parsed = parsed.body;
+        if (typeof parsed === "string") {
+          parsed = JSON.parse(parsed);
+        }
+      }
+
+      const rows = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+      return rows
+        .map((row) => (typeof row === "string" ? JSON.parse(row) : row))
+        .filter((row) => row && typeof row === "object");
+    }
+
+    async function fetchWeeklySchedule() {
+      const urlKey = "getSchedule";
+      const serviceUrl = await getServiceUrl(urlKey);
+      const response = await fetch(serviceUrl, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch weekly schedule data with status ${response.status}`);
+      }
+      const data = await response.json();
+      if (!data) throw new Error("Received empty data for weekly schedule.");
+      console.log("Fetched weekly schedule data:", data);
+      return data;
+    }
+
+    function getUniqueGameIds(form) {
+      const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+      const gameIds = [];
+      const seen = new Set();
+      for (const checkbox of checkboxes) {
+        if (!seen.has(checkbox.name)) {
+          seen.add(checkbox.name);
+          gameIds.push(checkbox.name);
+        }
+      }
+      return gameIds;
+    }
+
+    function updateGameSelectionHighlight(form, gameId) {
+      if (!form || !gameId) return;
+
+      const awayRadio = form.querySelector(`input[type="checkbox"][name="${CSS.escape(gameId)}"][value="A"]`);
+      const homeRadio = form.querySelector(`input[type="checkbox"][name="${CSS.escape(gameId)}"][value="H"]`);
+      if (!awayRadio || !homeRadio) return;
+
+      const checkboxRow = awayRadio.closest("tr");
+      if (!checkboxRow) return;
+
+      const nameRow = checkboxRow.nextElementSibling;
+      const awayCells = [awayRadio.closest("td")];
+      const homeCells = [homeRadio.closest("td")];
+
+      if (nameRow && nameRow.children.length >= 3) {
+        awayCells.push(nameRow.children[1]);
+        homeCells.push(nameRow.children[2]);
+      }
+
+      awayCells.forEach((cell) => { if (cell) cell.classList.remove("team-selected"); });
+      homeCells.forEach((cell) => { if (cell) cell.classList.remove("team-selected"); });
+
+      const selectedValue = awayRadio.checked ? "A" : homeRadio.checked ? "H" : "";
+
+      if (selectedValue === "A") {
+        awayCells.forEach((cell) => { if (cell) cell.classList.add("team-selected"); });
+      }
+      if (selectedValue === "H") {
+        homeCells.forEach((cell) => { if (cell) cell.classList.add("team-selected"); });
+      }
+    }
+
+    function refreshAllSelectionHighlights() {
+      const form = document.getElementById("picksheet");
+      if (!form) return;
+      for (const gameId of getUniqueGameIds(form)) {
+        updateGameSelectionHighlight(form, gameId);
+      }
+    }
+
+    function wireSelectionHighlighting() {
+      const form = document.getElementById("picksheet");
+      if (!form) return;
+      form.addEventListener("change", (event) => {
+        const target = event.target;
+        if (!target || target.tagName !== "INPUT" || target.type !== "checkbox") return;
+        updateGameSelectionHighlight(form, target.name);
+      });
+    }
+
+    function checkAllAwayTeams() {
+      const form = document.getElementById("picksheet");
+      if (!form) return;
+      clearMyPicks();
+      for (const name of getUniqueGameIds(form)) {
+        const target = form.querySelector(`input[type="checkbox"][name="${CSS.escape(name)}"][value="A"]`);
+        if (target) target.checked = true;
+      }
+    }
+
+    function checkAllHomeTeams() {
+      const form = document.getElementById("picksheet");
+      if (!form) return;
+      clearMyPicks();
+      for (const name of getUniqueGameIds(form)) {
+        const target = form.querySelector(`input[type="checkbox"][name="${CSS.escape(name)}"][value="H"]`);
+        if (target) target.checked = true;
+      }
+      refreshAllSelectionHighlights();
+    }
+
+    function checkAllFavorites() {
+      const form = document.getElementById("picksheet");
+      if (!form) return;
+      for (const gameId of getUniqueGameIds(form)) {
+        if (document.getElementById(`${gameId}-H-spread`)) {
+          document.getElementById(`${gameId}A`).checked = true;
+          document.getElementById(`${gameId}H`).checked = false;
+        }
+        if (document.getElementById(`${gameId}-A-spread`)) {
+          document.getElementById(`${gameId}H`).checked = true;
+          document.getElementById(`${gameId}A`).checked = false;
+        }
+        refreshAllSelectionHighlights();
+      }
+    }
+
+    function checkAllUnderdogs() {
+      const form = document.getElementById("picksheet");
+      if (!form) return;
+      for (const gameId of getUniqueGameIds(form)) {
+        if (document.getElementById(`${gameId}-H-spread`)) {
+          document.getElementById(`${gameId}A`).checked = false;
+          document.getElementById(`${gameId}H`).checked = true;
+        }
+        if (document.getElementById(`${gameId}-A-spread`)) {
+          document.getElementById(`${gameId}H`).checked = false;
+          document.getElementById(`${gameId}A`).checked = true;
+        }
+      }
+      refreshAllSelectionHighlights();
+    }
+
+    function checkAllRandom() {
+      const form = document.getElementById("picksheet");
+      if (!form) return;
+      clearMyPicks();
+      for (const gameId of getUniqueGameIds(form)) {
+        const randomSide = Math.random() < 0.5 ? "A" : "H";
+        const target = form.querySelector(`input[type="checkbox"][name="${CSS.escape(gameId)}"][value="${randomSide}"]`);
+        if (target) target.checked = true;
+      }
+      const tieBreaker = document.getElementById("mondayNightTieBreaker");
+      tieBreaker.value = Math.floor(Math.random() * 50) + 21;
+      refreshAllSelectionHighlights();
+    }
+
+    function clearMyPicks() {
+      const form = document.getElementById("picksheet");
+      if (!form) return;
+      form.querySelectorAll('input[type="checkbox"]').forEach((cb) => (cb.checked = false));
+      const tieBreakerInput = document.getElementById("mondayNightTieBreaker");
+      if (tieBreakerInput) tieBreakerInput.value = "";
+      refreshAllSelectionHighlights();
+    }
+
+    function sleep(time) {
+      return new Promise((resolve) => setTimeout(resolve, time));
+    }
+
+    async function loadPickSheetPage() {
+      setLoadingSpinnerVisible(true);
+      await sleep(200);
+      try {
+        setDiagnostics("");
+        const picksBody = document.getElementById("picksBody");
+        if (picksBody) {
+          picksBody.innerHTML = renderPickSheetSkeleton();
+        }
+
+        const [pickSheetData] = await Promise.all([
+          fetchWeeklySchedule(),
+        ]);
+
+        const list = normalizeScheduleRows(pickSheetData);
+        if (picksBody) {
+          console.log("Rendering pick sheet with data:", list);
+          picksBody.innerHTML = await renderPickSheet(list);
+          document.querySelector('#picksheet table').style.visibility = 'visible';
+        }
+
+        wireSelectionHighlighting();
+        setDiagnostics("");
+        console.log("Dispatching picksheet:rendered event");
+        window.dispatchEvent(new Event("picksheet:rendered"));
+      } catch (error) {
+        console.error("Error:", error);
+        setDiagnostics(`Load error: ${error?.message || "Unknown error"}`);
+      } finally {
+        setLoadingSpinnerVisible(false);
+      }
+    }
+
+    function buildPickSheetPdfHtml() {
+      const tbody = document.getElementById('picksBody').innerHTML;
+      return `<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; font-size: 9px; color: #000; background: #fff; margin: 0.5cm; }
+  table { border-collapse: collapse; width: auto; }
+  th { background-color: #4caf50; color: #fff; padding: 3px 8px; text-align: center; }
+  td { padding: 2px 6px; text-align: center; vertical-align: middle; border-bottom: 1px solid #e0e0e0; color: #000; }
+  tr.game-even td { background-color: #f9f9f9; }
+  tr.game-odd td { background-color: #fff; }
+  img { width: 20px; height: 20px; }
+</style>
+</head>
+<body>
+<table>
+  <thead><tr><th>Pick</th><th>Away</th><th>Home</th><th>Pick</th></tr></thead>
+  <tbody>${tbody}</tbody>
+</table>
+</body>
+</html>`;
+    }
+
+    async function generatePDF(filename) {
+      const apiEndpoint = await getServiceUrl("htmlToPdf");
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html: buildPickSheetPdfHtml(), filename })
+      });
+      const data = await response.json();
+      const body = JSON.parse(data.body);
+      console.log("Response from HTML to PDF API:", response.status, body);
+      alert(`PDF generated successfully. Download URL: ${body.download_url}`);
+    }
+
+    // Set current week banner
+    try {
+      const currentWeek = await getCurrentWeek();
+      console.log("Current week data:", currentWeek);
+      setInfoBanner(`Week ${currentWeek} Pick Sheet`);
+      document.getElementById("infoBanner").style.display = "block";
+      window.currentWeek = currentWeek;
+    } catch (error) {
+      console.error("Error fetching current week data:", error);
+      alert("Failed to load current week data. Please try again later.");
+    }
+
+    await loadPickSheetPage();
+    const yearStr = String(new Date().getFullYear());
+    const fileName = `picksheet_week_${window.currentWeek}_${yearStr}.pdf`;
+    await generatePDF(fileName);
+  </script>
+</body>
+
+</html>

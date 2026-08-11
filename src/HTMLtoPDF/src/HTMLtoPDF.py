@@ -1,7 +1,6 @@
 import json
 import boto3
 import os
-import tempfile
 from weasyprint import HTML
 from botocore.client import Config as CORSConfig
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
@@ -30,10 +29,11 @@ def htmlToPdf():
     destination = f'{PDF_DIR}/{output_key}'
     tmp_pdf_path = f'/tmp/{output_key}'
 
+    base_url = request_body.get('base_url', 'https://my-fbp.com')
     if url:
         HTML(url=url).write_pdf(tmp_pdf_path)
     elif html_content:
-        HTML(string=html_content).write_pdf(tmp_pdf_path)
+        HTML(string=html_content, base_url=base_url).write_pdf(tmp_pdf_path)
     else:
         return {'statusCode': 400, 'body': json.dumps({'error': 'Provide either url or html'})}
 
