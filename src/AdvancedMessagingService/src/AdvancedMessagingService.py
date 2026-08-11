@@ -135,7 +135,7 @@ class EmailService:
     @tracer.capture_method
     def send(self, message_type: str, channel: str, recipient: Optional[str],
              data: Dict[str, Any], reply_to: Optional[str] = None, tags: Optional[Dict[str, str]] = None) -> MessagingResponse:
-
+        s3 = boto3.client('s3')
         try:
             msg_enum = MessageType(message_type)
             content_generator = self._get_content_generator(msg_enum)
@@ -171,24 +171,48 @@ class EmailService:
                                             recipient=recipient, message_id=f"bulk:{len(users)}")
 
                 case MessageType.PICKSHEET:
+                    year = os.environ.get("YEAR")
+                    if not year:
+                        raise ValueError("YEAR environment variable not set")
+                    week=getCurrentWeek()
+                    if not week:
+                        raise ValueError("Current week could not be determined")
                     users = self._get_bulk_users('emailPickSheet', channel="email")
                     if not users:
                         logger.info("No picksheet users found")
                     for user in users:
                         user_data = {**data, "user_name": user.get("firstName") or user["email"]}
-                        self._send_one(user["email"], content_generator, user_data, message_type)
+                        fileKey=f'pdfs/picksheet_week_{week}_{year}.pdf'
+                        pdf_bytes = boto3.client('s3').get_object(Bucket=self.s3_bucket,
+                                        Key=fileKey)['Body'].read()
+                        if not pdf_bytes:
+                            raise ValueError(f"PDF for week {week} and year {year} could not be retrieved")
+                        self._send_one(user["email"], content_generator,
+                                       user_data, message_type,
+                                       pdf_bytes=pdf_bytes, pdf_filename=f"picksheet_week_{week}_{year}.pdf")
                     return MessagingResponse(success=True, channel="email", message_type=message_type,
                                             recipient=recipient, message_id=f"bulk:{len(users)}")
 
                 case MessageType.GRIDSHEET:
+                    year = os.environ.get("YEAR")
+                    if not year:
+                        raise ValueError("YEAR environment variable not set")
+                    week = getCurrentWeek()
+                    if not week:
+                        raise ValueError("Current week could not be determined")
+                    fileKey = f"pdfs/gridsheet_week_{week}_{year}.pdf"
+                    logger.info(f"Fetching gridsheet PDF", extra={"bucket": self.s3_bucket, "key": fileKey})
+                    pdf_bytes = s3.get_object(Bucket=self.s3_bucket, Key=fileKey)['Body'].read()
+                    if not pdf_bytes:
+                        raise ValueError(f"PDF for week {week} and year {year} could not be retrieved")
                     users = self._get_bulk_users('emailGridSheet', channel="email")
-                    logger.info(f"Bulk Users: {users}")
                     if not users:
                         logger.info("No gridsheet users found")
                     for user in users:
                         user_data = {**data, "user_name": user.get("firstName") or user["email"]}
-                        pdf_bytes = boto3.client('s3').get_object(Bucket=self.s3_bucket, Key='pdfs/gridsheet_week_9_2026.pdf')['Body'].read()
-                        self._send_one(recipient=user["email"], content_generator=content_generator, data=user_data, message_type=message_type, pdf_bytes=pdf_bytes, pdf_filename="gridsheet_week_9_2026.pdf")
+                        self._send_one(recipient=user["email"], content_generator=content_generator,
+                                       data=user_data, message_type=message_type,
+                                       pdf_bytes=pdf_bytes, pdf_filename=f"gridsheet_week_{week}_{year}.pdf")
                     return MessagingResponse(success=True, channel="email", message_type=message_type,
                                             recipient=recipient, message_id=f"bulk:{len(users)}")
 
