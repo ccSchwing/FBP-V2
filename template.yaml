@@ -13,20 +13,20 @@ Parameters:
   Year:
     Type: String
     Default: "2026"
-  # FBPUsersTableName:
-  #   Type: String
-  #   Default: FBP-Users
-  # FBPScheduleTableName:
-  #   Type: String
-  #   Default: 2025-Schedule
-  # FBPPicksTableName:
-  #   Type: String
-  #   Default: FBP-Picks
+  FBPUsersTableName:
+    Type: String
+    Default: FBP-Users
+  FBPScheduleTableName:
+    Type: String
+    Default: Schedule
+  FBPPicksTableName:
+    Type: String
+    Default: FBP-Picks
   # This is the original weekly results table.
   # After coding for a new table, this can be removed.
-  # FBPWeeklyResultsTableName:
-  #   Type: String
-  #   Default: FBP-Weekly-Results
+  FBPWeeklyResultsTableName:
+    Type: String
+    Default: FBP-Weekly-Results
   # This is the new weekly results table that will be used going forward.
   # It uses a Global Secondary Index on WeekIndex to make it easier to query by week.
   # It will replace the original FBPWeeklyResultsTableName after
@@ -34,15 +34,18 @@ Parameters:
   # FBPWeeklyResults2025TableName:
   #   Type: String
   #   Default: FBP-Weekly-Results-2025
-  # FBPTeamRecordsTableName:
-  #   Type: String
-  #   Default: 2025-Record
-  # TwilioOptOutTableName:
-  #   Type: String
-  #   Default: FBP-SMS-Opt-Outs
-  # FBPPayoutLedgerTableName:
-  #   Type: String
-  #   Default: FBP-Payout-Ledger
+  FBPTeamRecordsTableName:
+    Type: String
+    Default: Record
+  TwilioOptOutTableName:
+    Type: String
+    Default: FBP-SMS-Opt-Outs
+  FBPPayoutLedgerTableName:
+    Type: String
+    Default: FBP-Payout-Ledger
+  FBPSMSOptOutsTableName:
+    Type: String
+    Default: FBP-SMS-Opt-Outs
   CloudFrontDomain:
     Type: String
     Default: my-fbp.com
@@ -52,6 +55,9 @@ Parameters:
   FBPWeeklyResultsWeekIndexName:
     Type: String
     Default: WeekIndex
+  TransactionsTableName:
+    Type: String
+    Default: Transactions
   # This is the GSI on the new weekly results table to make it easier to query by week.
   # FBPWeeklyResults2025WeekIndexName:
   #   Type: String
@@ -128,328 +134,46 @@ Resources:
         MaxAge: 300
   MyApiMapping:          # ← add it here, same level as everything else
     Type: AWS::ApiGatewayV2::ApiMapping
+    DependsOn: FBPHttpApiprodStage
     Properties:
       DomainName: my-fbp.com
       ApiId: !Ref FBPHttpApi
-      Stage: !Ref FBPHttpApiprodStage
-  ##
-  # DB tables
-  ##
-  DynamoDBLogsTable:
+      Stage: prod
+
+  TransactionsTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      TableName: !Sub "${Year}-Log"
-      TableClass: STANDARD
-
-      # Key Schema
+      TableName: !Sub "${Year}-Transactions"
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
       AttributeDefinitions:
-        - AttributeName: level
-          AttributeType: S   # String
+        - AttributeName: transactionId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
         - AttributeName: timestamp
-          AttributeType: S   # String
+          AttributeType: S
       KeySchema:
-        - AttributeName: level
-          KeyType: HASH      # Partition Key
-        - AttributeName: timestamp
-          KeyType: RANGE     # Sort Key
-
-      # Billing Mode
-      BillingMode: PAY_PER_REQUEST  # On-Demand
-      SSESpecification:
-        SSEEnabled: true
-        SSEType: KMS
-      # DynamoDB Streams
-      StreamSpecification:
-        StreamViewType: NEW_AND_OLD_IMAGES
-
-      # Deletion Protection (set to true to prevent accidental deletion)
-      DeletionProtectionEnabled: true
-
-      # Point-in-Time Recovery (disabled to match original, enable if needed)
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-
-      # Tags (add any tags here as needed)
-      # Tags:
-      #   - Key: Environment
-      #     Value: Production
-  DynamoDBFBPUsersTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      TableName: !Sub "${Year}-FBP-Users"
-      TableClass: STANDARD
-
-      # Key Schema (Partition Key only - no Sort Key)
-      AttributeDefinitions:
-        - AttributeName: email
-          AttributeType: S   # String
-      KeySchema:
-        - AttributeName: email
-          KeyType: HASH      # Partition Key
-
-      # Billing Mode
-      BillingMode: PAY_PER_REQUEST  # On-Demand
-
-      # Encryption at Rest
-      SSESpecification:
-        SSEEnabled: true
-        SSEType: KMS
-        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
-
-      # Deletion Protection
-      DeletionProtectionEnabled: true
-
-      # Point-in-Time Recovery
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-  DynamoDBScheduleTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      TableName: !Sub "${Year}-Schedule"
-      TableClass: STANDARD
-
-      # Key Schema
-      AttributeDefinitions:
-        - AttributeName: Week
-          AttributeType: N   # Number
-        - AttributeName: GameId
-          AttributeType: S   # String
-      KeySchema:
-        - AttributeName: Week
-          KeyType: HASH      # Partition Key
-        - AttributeName: GameId
-          KeyType: RANGE     # Sort Key
-
-      # Billing Mode
-      BillingMode: PAY_PER_REQUEST  # On-Demand
-
-      # Encryption at Rest
-      SSESpecification:
-        SSEEnabled: true
-        SSEType: KMS
-        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
-
-      # Deletion Protection
-      DeletionProtectionEnabled: true
-
-      # Point-in-Time Recovery
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-  DynamoDBFBPConfigTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      TableName: !Sub "${Year}-FBP-Config"
-      TableClass: STANDARD
-
-      # Key Schema (Partition Key only - no Sort Key)
-      AttributeDefinitions:
-        - AttributeName: Week
-          AttributeType: N   # Number
-      KeySchema:
-        - AttributeName: Week
-          KeyType: HASH      # Partition Key
-
-      # Billing Mode
-      BillingMode: PAY_PER_REQUEST  # On-Demand
-
-      # Encryption at Rest
-      SSESpecification:
-        SSEEnabled: true
-        SSEType: KMS
-        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
-
-      # Deletion Protection
-      DeletionProtectionEnabled: true
-  DynamoDBFBPPicksTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      TableName: !Sub "${Year}-FBP-Picks"
-      TableClass: STANDARD
-
-      # Key Schema (Partition Key only - no Sort Key)
-      AttributeDefinitions:
-        - AttributeName: email
-          AttributeType: S   # String
-        - AttributeName: Week
-          AttributeType: N   # Number
-      KeySchema:
-        - AttributeName: email
-          KeyType: HASH      # Partition Key
-
-      # Billing Mode
-      BillingMode: PAY_PER_REQUEST  # On-Demand
-
-      # Global Secondary Index
+        - AttributeName: transactionId
+          KeyType: HASH
       GlobalSecondaryIndexes:
-        - IndexName: WeekIndex
+        - IndexName: userId-timestamp-index
           KeySchema:
-            - AttributeName: Week
-              KeyType: HASH  # GSI Partition Key
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
           Projection:
-            ProjectionType: ALL  # All attributes projected
-
-      # Encryption at Rest
-      SSESpecification:
-        SSEEnabled: true
-        SSEType: KMS
-        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
-
-      # Deletion Protection
-      DeletionProtectionEnabled: true
-
-      # Point-in-Time Recovery
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-  DynamoDBFBPSMSOptOutsTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      TableName: !Sub "${Year}-FBP-SMS-Opt-Outs"
-      TableClass: STANDARD
-
-      # Key Schema (Partition Key only - no Sort Key)
-      AttributeDefinitions:
-        - AttributeName: phone_number
-          AttributeType: S   # String
-      KeySchema:
-        - AttributeName: phone_number
-          KeyType: HASH      # Partition Key
-
-      # Billing Mode
-      BillingMode: PAY_PER_REQUEST  # On-Demand
-
-      # Encryption at Rest
-      SSESpecification:
-        SSEEnabled: true
-        SSEType: KMS
-        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
-
-      # Deletion Protection
-      DeletionProtectionEnabled: true
-
-      # Point-in-Time Recovery
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-  DynamoDBFBPWeeklyResultsTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      TableName: !Sub "${Year}-FBP-Weekly-Results"
-      TableClass: STANDARD
-
-      # Key Schema (Partition Key only - no Sort Key)
-      AttributeDefinitions:
-        - AttributeName: email
-          AttributeType: S   # String
-        - AttributeName: Week
-          AttributeType: N   # Number
-      KeySchema:
-        - AttributeName: email
-          KeyType: HASH      # Partition Key
-
-      # Billing Mode
-      BillingMode: PAY_PER_REQUEST  # On-Demand
-
-      # Global Secondary Index
-      GlobalSecondaryIndexes:
-        - IndexName: WeekIndex
-          KeySchema:
-            - AttributeName: Week
-              KeyType: HASH  # GSI Partition Key
-          Projection:
-            ProjectionType: ALL  # All attributes projected
-
-      # Encryption at Rest
-      SSESpecification:
-        SSEEnabled: true
-        SSEType: KMS
-        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
-
-      # Deletion Protection
-      DeletionProtectionEnabled: true
-
-      # Point-in-Time Recovery
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-
-  DynamoDBFBPPayoutLedgerTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      TableName: !Sub "${Year}-FBP-Payout-Ledger"
-      TableClass: STANDARD
-
-      # Key Schema
-      AttributeDefinitions:
-        - AttributeName: RecordType
-          AttributeType: S   # String
-        - AttributeName: Timestamp
-          AttributeType: S   # String
-      KeySchema:
-        - AttributeName: RecordType
-          KeyType: HASH      # Partition Key
-        - AttributeName: Timestamp
-          KeyType: RANGE     # Sort Key
-
-      # Billing Mode
-      BillingMode: PAY_PER_REQUEST  # On-Demand
-
-      # Encryption at Rest
-      SSESpecification:
-        SSEEnabled: true
-        SSEType: KMS
-        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
-
-      # Deletion Protection
-      DeletionProtectionEnabled: true
-
-      # Point-in-Time Recovery
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-  DynamoDBFBPRecordTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      TableName: !Sub "${Year}-Record"
-      TableClass: STANDARD
-
-      # Key Schema (Partition Key only - no Sort Key)
-      AttributeDefinitions:
-        - AttributeName: TeamName
-          AttributeType: S   # String
-      KeySchema:
-        - AttributeName: TeamName
-          KeyType: HASH      # Partition Key
-
-      # Billing Mode
-      BillingMode: PAY_PER_REQUEST  # On-Demand
-
-      # Encryption at Rest
-      SSESpecification:
-        SSEEnabled: true
-        SSEType: KMS
-        # KMSMasterKeyId: arn:aws:kms:us-east-1:xxxx:key/xxxx  # Uncomment for Customer Managed Key
-
-      # Deletion Protection
-      DeletionProtectionEnabled: true
-
-      # Point-in-Time Recovery
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
+            ProjectionType: ALL
+      Tags:
+        - Key: Name
+          Value: TransactionsTable
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:

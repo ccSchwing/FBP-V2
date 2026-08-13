@@ -1,0 +1,47 @@
+[
+  {
+    "ResourceType": "AWS::DynamoDB::Table",
+    "LogicalResourceId": "DynamoDBLogsTable",
+    "ResourceIdentifier": {"TableName": "2026-Log"}
+  },
+  {
+    "ResourceType": "AWS::DynamoDB::Table",
+    "LogicalResourceId": "DynamoDBFBPUsersTable",
+    "ResourceIdentifier": {"TableName": "2026-FBP-Users"}
+  },
+  {
+    "ResourceType": "AWS::DynamoDB::Table",
+    "LogicalResourceId": "DynamoDBScheduleTable",
+    "ResourceIdentifier": {"TableName": "2026-Schedule"}
+  },
+  {
+    "ResourceType": "AWS::DynamoDB::Table",
+    "LogicalResourceId": "DynamoDBFBPConfigTable",
+    "ResourceIdentifier": {"TableName": "2026-FBP-Config"}
+  },
+  {
+    "ResourceType": "AWS::DynamoDB::Table",
+    "LogicalResourceId": "DynamoDBFBPPicksTable",
+    "ResourceIdentifier": {"TableName": "2026-FBP-Picks"}
+  },
+  {
+    "ResourceType": "AWS::DynamoDB::Table",
+    "LogicalResourceId": "DynamoDBFBPSMSOptOutsTable",
+    "ResourceIdentifier": {"TableName": "2026-FBP-SMS-Opt-Outs"}
+  },
+  {
+    "ResourceType": "AWS::DynamoDB::Table",
+    "LogicalResourceId": "DynamoDBFBPWeeklyResultsTable",
+    "ResourceIdentifier": {"TableName": "2026-FBP-Weekly-Results"}
+  },
+  {
+    "ResourceType": "AWS::DynamoDB::Table",
+    "LogicalResourceId": "DynamoDBFBPPayoutLedgerTable",
+    "ResourceIdentifier": {"TableName": "2026-FBP-Payout-Ledger"}
+  },
+  {
+    "ResourceType": "AWS::DynamoDB::Table",
+    "LogicalResourceId": "DynamoDBFBPRecordTable",
+    "ResourceIdentifier": {"TableName": "2026-Record"}
+  }
+]
