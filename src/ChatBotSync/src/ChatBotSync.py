@@ -96,28 +96,28 @@ def export_tables_to_csv():
     # Define your Football app tables
     tables_to_export = [
         {
-            'table_name': '2025-Record',
-            'filename': '2025-Record',
+            'table_name': '2026-Record',
+            'filename': '2026-Record',
             'privacy_level': 'public'
         },
         {
-            'table_name': 'FBP-Picks', 
-            'filename': 'FBP-Picks',
+            'table_name': '2026-FBP-Picks', 
+            'filename': '2026-FBP-Picks',
             'privacy_level': 'private'
         },
         {
-            'table_name': 'FBP-Users',
-            'filename': 'FBP-Users',
+            'table_name': '2026-FBP-Users',
+            'filename': '2026-FBP-Users',
             'privacy_level': 'private'
         },
         {
-            'table_name': 'FBP-Weekly-Results-2025',
-            'filename': 'FBP-Weekly-Results-2025',
+            'table_name': '2026-FBP-Weekly-Results',
+            'filename': '2026-FBP-Weekly-Results',
             'privacy_level': 'private'
         },
         {
-            'table_name': '2025-Schedule', 
-            'filename': '2025-Schedule',
+            'table_name': '2026-Schedule', 
+            'filename': '2026-Schedule',
             'privacy_level': 'private'
         }
     ]
@@ -144,40 +144,44 @@ def export_tables_to_csv():
                 # Handle Decimal types (DynamoDB specific)
                 df = clean_dynamodb_dataframe(df)
                 
-                # Drop any NaN column names (caused by inconsistent keys across DynamoDB items)
-                df = df[[col for col in df.columns if isinstance(col, str)]]
+                # Drop any non-string column names (caused by inconsistent keys across DynamoDB items).
+                # Select only valid string column labels explicitly to avoid pandas/stub issues with
+                # boolean mask indexing when column names are mixed types.
+                columns = df.columns if isinstance(df.columns, pd.Index) else pd.Index([])
+                valid_columns = [column for column in columns if isinstance(column, str)]
+                df = df.loc[:, valid_columns]
                 
                 csv_filename = f"/tmp/{filename}.csv"
                 metadata_filename = None
                 
                 match table_name:
-                    case '2025-Record':
+                    case '2026-Record':
                         # Public tables: include all fields
                         metadata_filename = create_metadata_file(
                             csv_filename=csv_filename,
-                            content_fields=list(df.columns),
-                            include_fields=list(df.columns),
+                            content_fields=valid_columns,
+                            include_fields=valid_columns,
                             exclude_fields=[]
                         )
                         logger.info(f"Created metadata file: {metadata_filename}")
-                    case 'FBP-Picks':
+                    case '2026-FBP-Picks':
                         # Private tables: exclude sensitive fields
-                        sensitive_fields = ['email', 'tieBreaker','Winner']
-                        include_fields = [field for field in df.columns if field not in sensitive_fields]
-                        df=df[include_fields]
+                        sensitive_fields = ['email', 'tieBreaker', 'Winner']
+                        include_fields = [field for field in valid_columns if field not in sensitive_fields]
+                        df = df.loc[:, include_fields]
                         metadata_filename = create_metadata_file(
                             csv_filename=csv_filename,
-                            content_fields=list(df.columns),
+                            content_fields=include_fields,
                             include_fields=include_fields,
                             exclude_fields=sensitive_fields
                         )
                         logger.info(f"Created metadata file: {metadata_filename}")
-                    case 'FBP-Users':
+                    case '2026-FBP-Users':
                         # Private tables: exclude sensitive fields
                         sensitive_fields = ['email', 'firstName', 'lastName', 'beta', 'Winner', 'mobile_number', 'verification_code', 'verification_code_hash']
                         content_fields = ['displayName']
-                        include_fields = [field for field in df.columns if field not in sensitive_fields]
-                        df=df[include_fields]
+                        include_fields = [field for field in valid_columns if field not in sensitive_fields]
+                        df = df.loc[:, include_fields]
                         metadata_filename = create_metadata_file(
                             csv_filename=csv_filename,
                             content_fields=content_fields,
@@ -185,27 +189,27 @@ def export_tables_to_csv():
                             exclude_fields=sensitive_fields
                         )
                         logger.info(f"Created metadata file: {metadata_filename}")
-                    case 'FBP-Weekly-Results-2025':
+                    case '2026-FBP-Weekly-Results':
                         # Private tables: exclude sensitive fields
                         sensitive_fields = ['email']
-                        include_fields = [field for field in df.columns if field not in sensitive_fields]
-                        df=df[include_fields]
+                        include_fields = [field for field in valid_columns if field not in sensitive_fields]
+                        df = df.loc[:, include_fields]
                         metadata_filename = create_metadata_file(
                             csv_filename=csv_filename,
-                            content_fields=list(df.columns),
+                            content_fields=include_fields,
                             include_fields=include_fields,
                             exclude_fields=sensitive_fields
                         )
                         logger.info(f"Created metadata file: {metadata_filename}")
-                    case '2025-Schedule':
+                    case '2026-Schedule':
                         # Public tables: include all fields
                         sensitive_fields = ['FinalWithSpread', 'GameId']
-                        include_fields = [field for field in df.columns if field not in sensitive_fields]
-                        df=df[include_fields]
+                        include_fields = [field for field in valid_columns if field not in sensitive_fields]
+                        df = df.loc[:, include_fields]
                         metadata_filename = create_metadata_file(
                             csv_filename=csv_filename,
                             content_fields=['Week', 'Home', 'Away'],
-                            include_fields=list(df.columns),
+                            include_fields=include_fields,
                             exclude_fields=sensitive_fields
                         )
                         logger.info(f"Created metadata file: {metadata_filename}")

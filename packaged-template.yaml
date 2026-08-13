@@ -1,0 +1,3068 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Globals:
+  Function:
+    Architectures:
+    - arm64
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        POWERTOOLS_SERVICE_NAME: FBPService
+Parameters:
+  Year:
+    Type: String
+    Default: '2026'
+  CloudFrontDomain:
+    Type: String
+    Default: my-fbp.com
+  PdfLoggingBucketName:
+    Type: String
+    Default: fbp-pdf-logging
+  FBPWeeklyResultsWeekIndexName:
+    Type: String
+    Default: WeekIndex
+  S3BucketName:
+    Type: String
+    Default: my-fbp.com
+  SESBucketName:
+    Type: String
+    Default: my-fbp-inbound-email
+  ForwardToEmail:
+    Type: String
+    Description: External email address to forward emails to
+    Default: chuckschwing@proton.me
+  FromEmail:
+    Type: String
+    Description: Verified SES identity to send from
+    Default: fbpadmin@my-fbp.com
+  CompanyName:
+    Type: String
+    Default: FBP
+  BaseUrl:
+    Type: String
+    Default: https://my-fbp.com
+  SupportEmail:
+    Type: String
+    Description: Support email address for the company
+    Default: fbpadmin@my-fbp.com
+  TwilioPhoneNumber:
+    Type: String
+    Description: Originating Twilio phone number in E.164 format (e.g., +1234567890)
+    Default: '+16093012328'
+    AllowedPattern: ^\+[1]\d{1,11}$
+  TwilioCredentialsSecretArn:
+    Type: String
+    Description: ARN of the Secrets Manager secret containing Twilio credentials
+    Default: arn:aws:secretsmanager:us-east-1:768286545465:secret:TWILIO_SECRET-a6Y1ZP
+  TwilioSecret:
+    Type: String
+    Description: JSON string containing Twilio credentials (Account SID and Auth Token
+      and Twilio Phone number).
+    Default: Twilio-Secret
+  KnowledgeBaseId:
+    Type: String
+    Description: ID of the Bedrock Knowledge Base
+    Default: FLBWAWSNBG
+  DataSourceId:
+    Type: String
+    Description: ID of the Bedrock data source
+    Default: LULFE6CQPM
+Resources:
+  FBPHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowHeaders:
+        - content-type
+        - x-amz-date
+        - authorization
+        - x-api-key
+        - x-amz-security-token
+        AllowMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+        AllowOrigins:
+        - '*'
+        MaxAge: 300
+    Metadata:
+      SamResourceId: FBPHttpApi
+  MyApiMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName: my-fbp.com
+      ApiId:
+        Ref: FBPHttpApi
+      Stage:
+        Ref: FBPHttpApiprodStage
+    Metadata:
+      SamResourceId: MyApiMapping
+  DynamoDBLogsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName:
+        Fn::Sub: ${Year}-Log
+      TableClass: STANDARD
+      AttributeDefinitions:
+      - AttributeName: level
+        AttributeType: S
+      - AttributeName: timestamp
+        AttributeType: S
+      KeySchema:
+      - AttributeName: level
+        KeyType: HASH
+      - AttributeName: timestamp
+        KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      DeletionProtectionEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+    Metadata:
+      SamResourceId: DynamoDBLogsTable
+  DynamoDBFBPUsersTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName:
+        Fn::Sub: ${Year}-FBP-Users
+      TableClass: STANDARD
+      AttributeDefinitions:
+      - AttributeName: email
+        AttributeType: S
+      KeySchema:
+      - AttributeName: email
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      DeletionProtectionEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+    Metadata:
+      SamResourceId: DynamoDBFBPUsersTable
+  DynamoDBScheduleTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName:
+        Fn::Sub: ${Year}-Schedule
+      TableClass: STANDARD
+      AttributeDefinitions:
+      - AttributeName: Week
+        AttributeType: N
+      - AttributeName: GameId
+        AttributeType: S
+      KeySchema:
+      - AttributeName: Week
+        KeyType: HASH
+      - AttributeName: GameId
+        KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      DeletionProtectionEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+    Metadata:
+      SamResourceId: DynamoDBScheduleTable
+  DynamoDBFBPConfigTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName:
+        Fn::Sub: ${Year}-FBP-Config
+      TableClass: STANDARD
+      AttributeDefinitions:
+      - AttributeName: Week
+        AttributeType: N
+      KeySchema:
+      - AttributeName: Week
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      DeletionProtectionEnabled: true
+    Metadata:
+      SamResourceId: DynamoDBFBPConfigTable
+  DynamoDBFBPPicksTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName:
+        Fn::Sub: ${Year}-FBP-Picks
+      TableClass: STANDARD
+      AttributeDefinitions:
+      - AttributeName: email
+        AttributeType: S
+      - AttributeName: Week
+        AttributeType: N
+      KeySchema:
+      - AttributeName: email
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+      - IndexName: WeekIndex
+        KeySchema:
+        - AttributeName: Week
+          KeyType: HASH
+        Projection:
+          ProjectionType: ALL
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      DeletionProtectionEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+    Metadata:
+      SamResourceId: DynamoDBFBPPicksTable
+  DynamoDBFBPSMSOptOutsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName:
+        Fn::Sub: ${Year}-FBP-SMS-Opt-Outs
+      TableClass: STANDARD
+      AttributeDefinitions:
+      - AttributeName: phone_number
+        AttributeType: S
+      KeySchema:
+      - AttributeName: phone_number
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      DeletionProtectionEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+    Metadata:
+      SamResourceId: DynamoDBFBPSMSOptOutsTable
+  DynamoDBFBPWeeklyResultsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName:
+        Fn::Sub: ${Year}-FBP-Weekly-Results
+      TableClass: STANDARD
+      AttributeDefinitions:
+      - AttributeName: email
+        AttributeType: S
+      - AttributeName: Week
+        AttributeType: N
+      KeySchema:
+      - AttributeName: email
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+      - IndexName: WeekIndex
+        KeySchema:
+        - AttributeName: Week
+          KeyType: HASH
+        Projection:
+          ProjectionType: ALL
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      DeletionProtectionEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+    Metadata:
+      SamResourceId: DynamoDBFBPWeeklyResultsTable
+  DynamoDBFBPPayoutLedgerTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName:
+        Fn::Sub: ${Year}-FBP-Payout-Ledger
+      TableClass: STANDARD
+      AttributeDefinitions:
+      - AttributeName: RecordType
+        AttributeType: S
+      - AttributeName: Timestamp
+        AttributeType: S
+      KeySchema:
+      - AttributeName: RecordType
+        KeyType: HASH
+      - AttributeName: Timestamp
+        KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      DeletionProtectionEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+    Metadata:
+      SamResourceId: DynamoDBFBPPayoutLedgerTable
+  DynamoDBFBPRecordTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName:
+        Fn::Sub: ${Year}-Record
+      TableClass: STANDARD
+      AttributeDefinitions:
+      - AttributeName: TeamName
+        AttributeType: S
+      KeySchema:
+      - AttributeName: TeamName
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      DeletionProtectionEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+    Metadata:
+      SamResourceId: DynamoDBFBPRecordTable
+  TransactionsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName:
+        Fn::Sub: ${Year}-Transactions
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      DeletionProtectionEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      AttributeDefinitions:
+      - AttributeName: transactionId
+        AttributeType: S
+      - AttributeName: timestamp
+        AttributeType: S
+      KeySchema:
+      - AttributeName: transactionId
+        KeyType: HASH
+      - AttributeName: timestamp
+        KeyType: RANGE
+    Metadata:
+      SamResourceId: TransactionsTable
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+        - my-fbp.com
+        - www.my-fbp.com
+        Origins:
+        - Id: S3WebsiteOrigin
+          DomainName: my-fbp.com.s3-website-us-east-1.amazonaws.com
+          CustomOriginConfig:
+            HTTPPort: 80
+            OriginProtocolPolicy: http-only
+        - Id: ApiGatewayOrigin
+          DomainName:
+            Fn::Sub: ${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+          CustomOriginConfig:
+            HTTPSPort: 443
+            OriginProtocolPolicy: https-only
+        DefaultCacheBehavior:
+          TargetOriginId: S3WebsiteOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          AllowedMethods:
+          - GET
+          - HEAD
+        CacheBehaviors:
+        - PathPattern: /prod/*
+          TargetOriginId: ApiGatewayOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+          - GET
+          - HEAD
+          - OPTIONS
+          - PUT
+          - POST
+          - PATCH
+          - DELETE
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+        ViewerCertificate:
+          AcmCertificateArn: arn:aws:acm:us-east-1:768286545465:certificate/f93ac44f-bcd3-4ab9-95b0-c22d185f9259
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        Enabled: true
+        HttpVersion: http2
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+    Metadata:
+      SamResourceId: CloudFrontDistribution
+  Route53ARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: my-fbp.com.
+      Name: my-fbp.com.
+      Type: A
+      AliasTarget:
+        DNSName:
+          Fn::GetAtt:
+          - CloudFrontDistribution
+          - DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+    Metadata:
+      SamResourceId: Route53ARecord
+  Route53AAAARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: my-fbp.com.
+      Name: my-fbp.com.
+      Type: AAAA
+      AliasTarget:
+        DNSName:
+          Fn::GetAtt:
+          - CloudFrontDistribution
+          - DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+    Metadata:
+      SamResourceId: Route53AAAARecord
+  FBPLibLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: fbplib
+      Description: Shared FBP Python utility library
+      ContentUri: s3://my-fbp.com/a907d6de3a0e2dcde55dbaec74ddfd7a
+      CompatibleRuntimes:
+      - python3.12
+    Metadata:
+      BuildMethod: python3.12
+      SamResourceId: FBPLibLayer
+  TwilioLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: twilio-layer
+      Description: Twilio Python SDK
+      ContentUri: s3://my-fbp.com/d6b4d3b40f50cb098cb06799eeea9516
+      CompatibleRuntimes:
+      - python3.12
+    Metadata:
+      SamResourceId: TwilioLayer
+  TwilioWebHook:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-twilio-webhook
+      CodeUri: s3://my-fbp.com/ad75a54c573126d86fd0a527482aed88
+      Handler: TwilioWebHook.lambda_handler
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      - Ref: TwilioLayer
+      Environment:
+        Variables:
+          TwilioOptOutTableName:
+            Fn::Sub: ${Year}-FBP-SMS-Opt-Outs
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-SMS-Opt-Outs
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      Events:
+        TwilioWebHookPost:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /twilio-webhook
+            Method: post
+            PayloadFormatVersion: '2.0'
+        TwilioWebHookOptionsApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /twilio-webhook
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: TwilioWebHook
+  WeasyprintLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: weasyprint-layer
+      Description: WeasyPrint HTML to PDF
+      ContentUri: s3://my-fbp.com/ccdd7fbb140a714aaf357317ac9ee380
+      CompatibleRuntimes:
+      - python3.12
+      CompatibleArchitectures:
+      - arm64
+    Metadata:
+      SamResourceId: WeasyprintLayer
+  HTMLtoPDF:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-html-to-pdf
+      CodeUri: s3://my-fbp.com/5f046ecd1a9cecef912208e650b8f1e4
+      Handler: HTMLtoPDF.lambda_handler
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      - Ref: WeasyprintLayer
+      Environment:
+        Variables:
+          S3BucketName:
+            Ref: S3BucketName
+          PDFLoggingBucket:
+            Ref: PdfLoggingBucketName
+          FONTCONFIG_PATH: /opt/fonts
+          FONTCONFIG_FILE: /opt/fonts/fonts.conf
+          LD_LIBRARY_PATH: /opt/lib
+          CloudFrontDomain:
+            Ref: CloudFrontDomain
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - s3:PutObject
+          - s3:GetObject
+          Resource:
+          - Fn::Sub: arn:aws:s3:::${S3BucketName}/*
+          - Fn::Sub: arn:aws:s3:::${PdfLoggingBucketName}/*
+      Events:
+        HTMLtoPDFPostApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /htmlToPdf
+            Method: post
+            PayloadFormatVersion: '2.0'
+        HTMLtoPDFOptionsApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /htmlToPdf
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: HTMLtoPDF
+  ChatBot:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-chatbot
+      CodeUri: s3://my-fbp.com/654f1c2ad46ead2acc14bcf8d852aa42
+      Handler: ChatBot.chatbot
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      Environment:
+        Variables:
+          KnowledgeBaseId:
+            Ref: KnowledgeBaseId
+          DataSourceId:
+            Ref: DataSourceId
+          S3BucketName:
+            Ref: S3BucketName
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - bedrock:RetrieveAndGenerate
+          - bedrock:Retrieve
+          - bedrock:AgenticRetrieveStream
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource: arn:aws:logs:*:*:*
+        - Effect: Allow
+          Action:
+          - s3:PutObject
+          - s3:GetObject
+          Resource:
+            Fn::Sub: arn:aws:s3:::${S3BucketName}/*
+      Events:
+        ChatBotPostApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /chatbot
+            Method: post
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: ChatBot
+  ChatBotSync:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-chatbotsync
+      CodeUri: s3://my-fbp.com/1e73022b254d3c7144f536448dbf4a00
+      Handler: ChatBotSync.export_dynamodb_to_kb
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      Environment:
+        Variables:
+          KnowledgeBaseId:
+            Ref: KnowledgeBaseId
+          DataSourceId:
+            Ref: DataSourceId
+          S3BucketName:
+            Ref: S3BucketName
+          FBPScheduleTableName:
+            Fn::Sub: ${Year}-Schedule
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPPicksTableName:
+            Fn::Sub: ${Year}-FBP-Picks
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPWeeklyResultsTableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Schedule
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Picks
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:Scan
+          - dynamodb:GetItem
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - bedrock:RetrieveAndGenerate
+          - bedrock:Retrieve
+          - bedrock:AgenticRetrieveStream
+          - bedrock:StartIngestionJob
+          - bedrock:DescribeIngestionJob
+          - bedrock:ListIngestionJobs
+          - bedrock:GetIngestionJob
+          Resource:
+          - Fn::Sub: arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${KnowledgeBaseId}
+          - Fn::Sub: arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:data-source/${DataSourceId}
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource: arn:aws:logs:*:*:*
+        - Effect: Allow
+          Action:
+          - s3:PutObject
+          - s3:GetObject
+          Resource:
+            Fn::Sub: arn:aws:s3:::${S3BucketName}/*
+      Events:
+        ChatBotSyncPostApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /chatbotsync
+            Method: post
+            PayloadFormatVersion: '2.0'
+        ChatBotSyncOptionsApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /chatbotsync
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: ChatBotSync
+  GetCurrentWeek:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-get-current-week
+      CodeUri: s3://my-fbp.com/9ab96812011a18831e835e9e6dc8f885
+      Handler: GetCurrentWeek.lambda_handler
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      Events:
+        GetCurrentWeekPostApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getCurrentWeek
+            Method: post
+            PayloadFormatVersion: '2.0'
+        GetCurrentWeekOptionsApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getCurrentWeek
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: GetCurrentWeek
+  UpdateTeamRecords:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-update-team-records
+      CodeUri: s3://my-fbp.com/a7be47b77f6bc3303826d8152945fc53
+      Handler: UpdateTeamRecords.lambda_handler
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          DynamoDBFBPRecordTable:
+            Fn::Sub: ${Year}-Record
+          FBPScheduleTableName:
+            Fn::Sub: ${Year}-Schedule
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Schedule
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Record
+      Events:
+        TeamRecordGetApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /updateTeamRecords
+            Method: get
+            PayloadFormatVersion: '2.0'
+        TeamRecordOptionsApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /updateTeamRecords
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: UpdateTeamRecords
+  GetTeamRecords:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-get-team-records
+      CodeUri: s3://my-fbp.com/1bb5df62b62ca1abaeef5bef0b892214
+      Handler: GetTeamRecords.lambda_handler
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          DynamoDBFBPRecordTable:
+            Fn::Sub: ${Year}-Record
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Record
+      Events:
+        GetTeamRecordsApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getTeamRecords
+            Method: get
+            PayloadFormatVersion: '2.0'
+        GetTeamRecordsOptionsApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getTeamRecords
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: GetTeamRecords
+  FBPPayoutLedger:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-fbp-payout-ledger
+      CodeUri: s3://my-fbp.com/10ad3ac4f63c0d557a6ddb74dbc8434f
+      Handler: FBPPayoutLedger.lambda_handler
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPWeeklyResultsTableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPPayoutLedgerTableName:
+            Fn::Sub: ${Year}-FBP-Payout-Ledger
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Payout-Ledger
+      Events:
+        FBPLedgerGetApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getFBPLedger
+            Method: get
+            PayloadFormatVersion: '2.0'
+        FBPLedgerPostDepositApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /deposit
+            Method: post
+            PayloadFormatVersion: '2.0'
+        FBPLedgerPostPayoutApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /payout
+            Method: post
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: FBPPayoutLedger
+  ImportSpreadsAndFinalScores:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-import-spreads-and-final-scores
+      CodeUri: s3://my-fbp.com/c54949c1a8ced870b4c1db65280c5ef7
+      Handler: ImportSpreadsAndFinalScores.importSpreadsAndFinalScores
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPScheduleTableName:
+            Fn::Sub: ${Year}-Schedule
+          S3BucketName:
+            Ref: S3BucketName
+          Year:
+            Ref: Year
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Schedule
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - s3:GetObject
+          Resource:
+            Fn::Sub: arn:aws:s3:::${S3BucketName}/*
+        - Effect: Allow
+          Action:
+          - s3:PutObject
+          Resource:
+            Fn::Sub: arn:aws:s3:::${S3BucketName}/*
+        - Effect: Allow
+          Action:
+          - s3:DeleteObject
+          Resource:
+            Fn::Sub: arn:aws:s3:::${S3BucketName}/*
+        - Effect: Allow
+          Action:
+          - s3:ListBucket
+          Resource:
+            Fn::Sub: arn:aws:s3:::${S3BucketName}
+    Metadata:
+      SamResourceId: ImportSpreadsAndFinalScores
+  OpenPool:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-open-pool
+      CodeUri: s3://my-fbp.com/ebe66c3dc4d718177d1de5f1710e1c70
+      Handler: OpenPool.openPool
+      Runtime: python3.12
+      Timeout: 240
+      MemorySize: 512
+      Layers:
+      - Ref: FBPLibLayer
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          SetPoolStatusOpen:
+            Ref: SetPoolStatusOpen
+          CalcWeeklyResults:
+            Ref: CalcWeeklyResults
+          UpdateWeeklyResults:
+            Ref: UpdateWeeklyResults
+          ImportSpreadsAndFinalScores:
+            Ref: ImportSpreadsAndFinalScores
+          AdvancedMessagingService:
+            Ref: AdvancedMessagingService
+          SendEmail:
+            Ref: SendEmail
+          FBPWeeklyResultsTableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - lambda:InvokeFunction
+          Resource:
+          - Fn::GetAtt:
+            - CalcWeeklyResults
+            - Arn
+          - Fn::GetAtt:
+            - UpdateWeeklyResults
+            - Arn
+          - Fn::GetAtt:
+            - ImportSpreadsAndFinalScores
+            - Arn
+          - Fn::GetAtt:
+            - AdvancedMessagingService
+            - Arn
+          - Fn::GetAtt:
+            - SendEmail
+            - Arn
+          - Fn::GetAtt:
+            - SetPoolStatusOpen
+            - Arn
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+    Metadata:
+      SamResourceId: OpenPool
+  ClosePool:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-close-pool
+      CodeUri: s3://my-fbp.com/81e20a24171b0eade572c0049a9397d2
+      Handler: ClosePool.lambda_handler
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          SetPoolStatusClosed:
+            Ref: SetPoolStatusClosed
+          SaveFBPPicks:
+            Ref: SaveFBPPicks
+          ImportSpreadsAndFinalScores:
+            Ref: ImportSpreadsAndFinalScores
+          AdvancedMessagingService:
+            Ref: AdvancedMessagingService
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - lambda:InvokeFunction
+          Resource:
+          - Fn::GetAtt:
+            - SaveFBPPicks
+            - Arn
+          - Fn::GetAtt:
+            - SendEmail
+            - Arn
+          - Fn::GetAtt:
+            - SetPoolStatusClosed
+            - Arn
+          - Fn::GetAtt:
+            - ImportSpreadsAndFinalScores
+            - Arn
+          - Fn::GetAtt:
+            - AdvancedMessagingService
+            - Arn
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      Events:
+        ClosePoolGET:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /closePool
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        ClosePoolOPTIONS:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /closePool
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: ClosePool
+  EmailForwarding:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-email-forwarder
+      CodeUri: s3://my-fbp.com/f3cf71085202e33565c7c63568f828bd
+      Handler: EmailForwarding.lambda_handler
+      Runtime: python3.12
+      MemorySize: 512
+      Layers:
+      - Ref: FBPLibLayer
+      Environment:
+        Variables:
+          FORWARD_TO_EMAIL:
+            Ref: ForwardToEmail
+          FROM_EMAIL:
+            Ref: FromEmail
+          SESBucketName:
+            Ref: SESBucketName
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - s3:GetObject
+          Resource:
+            Fn::Sub: arn:aws:s3:::${SESBucketName}/*
+        - Effect: Allow
+          Action:
+          - ses:SendEmail
+          - ses:SendRawEmail
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource:
+            Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+    Metadata:
+      SamResourceId: EmailForwarding
+  SESInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: EmailForwarding
+      Action: lambda:InvokeFunction
+      Principal: ses.amazonaws.com
+      SourceAccount:
+        Ref: AWS::AccountId
+    Metadata:
+      SamResourceId: SESInvokePermission
+  AdvancedMessagingServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+      - PolicyName: S3Policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            Resource:
+            - Fn::Sub: arn:aws:s3:::${SESBucketName}/*
+            - Fn::Sub: arn:aws:s3:::${S3BucketName}/*
+          - Effect: Allow
+            Action:
+            - s3:ListBucket
+            Resource:
+            - Fn::Sub: arn:aws:s3:::${SESBucketName}
+            - Fn::Sub: arn:aws:s3:::${S3BucketName}
+      - PolicyName: SESPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+            Resource: '*'
+      - PolicyName: TwilioSMSPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - secretsmanager:GetSecretValue
+            Resource:
+              Ref: TwilioCredentialsSecretArn
+      - PolicyName: DynamoDBPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:Query
+            - dynamodb:PutItem
+            Resource:
+            - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Users
+            - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-Log
+            - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-Twilio-Opt-Out
+            - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Config
+            - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Weekly-Results
+            - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Weekly-Results/index/${FBPWeeklyResultsWeekIndexName}
+      - PolicyName: XRayPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - xray:PutTraceSegments
+            - xray:PutTelemetryRecords
+            Resource: '*'
+    Metadata:
+      SamResourceId: AdvancedMessagingServiceRole
+  AdvancedMessagingService:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-advanced-messaging-service
+      CodeUri: s3://my-fbp.com/e637bf153e534927260f91ac056d7648
+      Handler: AdvancedMessagingService.lambda_handler
+      Runtime: python3.12
+      Timeout: 30
+      MemorySize: 256
+      Role:
+        Fn::GetAtt:
+        - AdvancedMessagingServiceRole
+        - Arn
+      Tracing: Active
+      Layers:
+      - Ref: FBPLibLayer
+      - Ref: TwilioLayer
+      Events:
+        AdvancedMessagingServicePost:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /advanced-messaging
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        AdvancedMessagingServiceOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /advanced-messaging
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+      Environment:
+        Variables:
+          FROM_EMAIL:
+            Ref: FromEmail
+          COMPANY_NAME:
+            Ref: CompanyName
+          BASE_URL:
+            Ref: BaseUrl
+          SUPPORT_EMAIL:
+            Ref: SupportEmail
+          FBPUSERS_TABLE_NAME:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPLOGS_TABLE_NAME:
+            Fn::Sub: ${Year}-Log
+          TWILIO_OPT_OUT_TABLE_NAME:
+            Fn::Sub: ${Year}-Twilio-Opt-Outs
+          TWILIO_CREDENTIALS_SECRET_ARN:
+            Ref: TwilioCredentialsSecretArn
+          POWERTOOLS_SERVICE_NAME: messaging-service
+          POWERTOOLS_LOG_LEVEL: INFO
+          POWERTOOLS_METRICS_NAMESPACE: MessagingService
+          POWERTOOLS_TRACER_CAPTURE_RESPONSE: true
+          POWERTOOLS_TRACER_CAPTURE_ERROR: true
+          YEAR:
+            Ref: Year
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+    Metadata:
+      SamResourceId: AdvancedMessagingService
+  AdvancedSMSServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+      - PolicyName: TwilioSMSPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - secretsmanager:GetSecretValue
+            Resource:
+              Ref: TwilioCredentialsSecretArn
+      - PolicyName: XRayPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - xray:PutTraceSegments
+            - xray:PutTelemetryRecords
+            Resource: '*'
+    Metadata:
+      SamResourceId: AdvancedSMSServiceRole
+  AdvancedSMSService:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-advanced-sms-service
+      CodeUri: s3://my-fbp.com/75632d0e667a0541ddd0b3440f1465c0
+      Handler: AdvancedSMSService.lambda_handler
+      Runtime: python3.12
+      Timeout: 30
+      MemorySize: 256
+      Role:
+        Fn::GetAtt:
+        - AdvancedSMSServiceRole
+        - Arn
+      Tracing: Active
+      Layers:
+      - Ref: FBPLibLayer
+      - Ref: TwilioLayer
+      Events:
+        AdvancedSMSServicePost:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /advanced-sms
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        GetUserStatusOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /advanced-sms
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+      Environment:
+        Variables:
+          TWILIO_SECRET:
+            Ref: TwilioSecret
+          TWILIO_PHONE_NUMBER:
+            Ref: TwilioPhoneNumber
+          COMPANY_NAME:
+            Ref: CompanyName
+          BASE_URL:
+            Ref: BaseUrl
+          SUPPORT_EMAIL:
+            Ref: SupportEmail
+          FBPUSERS_TABLE_NAME:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPLOGS_TABLE_NAME:
+            Fn::Sub: ${Year}-Log
+          TWILIO_OPT_OUT_TABLE_NAME:
+            Fn::Sub: ${Year}-Twilio-Opt-Outs
+          TWILIO_CREDENTIALS_SECRET_ARN:
+            Ref: TwilioCredentialsSecretArn
+          POWERTOOLS_SERVICE_NAME: email-service
+          POWERTOOLS_LOG_LEVEL: INFO
+          POWERTOOLS_METRICS_NAMESPACE: EmailService
+          POWERTOOLS_TRACER_CAPTURE_RESPONSE: true
+          POWERTOOLS_TRACER_CAPTURE_ERROR: true
+    Metadata:
+      SamResourceId: AdvancedSMSService
+  AdvancedEmailServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+      - PolicyName: SESPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+            Resource: '*'
+      - PolicyName: XRayPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - xray:PutTraceSegments
+            - xray:PutTelemetryRecords
+            Resource: '*'
+    Metadata:
+      SamResourceId: AdvancedEmailServiceRole
+  AdvancedEmailService:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-advanced-email-service
+      CodeUri: s3://my-fbp.com/3ce4b894302636578ed5af59787aba8e
+      Handler: AdvancedEmailService.lambda_handler
+      Runtime: python3.12
+      Timeout: 30
+      MemorySize: 256
+      Role:
+        Fn::GetAtt:
+        - AdvancedEmailServiceRole
+        - Arn
+      Tracing: Active
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        AdvancedEmailServicePost:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /advanced-email
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        GetUserStatusOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /advanced-email
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+      Environment:
+        Variables:
+          FROM_EMAIL:
+            Ref: FromEmail
+          COMPANY_NAME:
+            Ref: CompanyName
+          BASE_URL:
+            Ref: BaseUrl
+          SUPPORT_EMAIL:
+            Ref: SupportEmail
+          FBPUSERS_TABLE_NAME:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPLOGS_TABLE_NAME:
+            Fn::Sub: ${Year}-Log
+          POWERTOOLS_SERVICE_NAME: email-service
+          POWERTOOLS_LOG_LEVEL: INFO
+          POWERTOOLS_METRICS_NAMESPACE: EmailService
+          POWERTOOLS_TRACER_CAPTURE_RESPONSE: true
+          POWERTOOLS_TRACER_CAPTURE_ERROR: true
+    Metadata:
+      SamResourceId: AdvancedEmailService
+  SendEmailRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+      - PolicyName: SESPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+            - ses:SendTemplatedEmail
+            - ses:SendBulkTemplatedEmail
+            Resource: '*'
+      - PolicyName: DynamoDBPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:Scan
+            - dynamodb:Query
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            Resource:
+            - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Config
+            - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-Log
+            - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Users
+            - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Weekly-Results
+    Metadata:
+      SamResourceId: SendEmailRole
+  SMSValidationUtils:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/8e1adfef9e3c861154b31fc370044d27
+      Handler: SMSValidationUtils.lambda_handler
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-sms-validation-utils-code
+      Runtime: python3.12
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - Statement:
+        - Effect: Allow
+          Action:
+          - secretsmanager:GetSecretValue
+          Resource:
+            Ref: TwilioCredentialsSecretArn
+      Environment:
+        Variables:
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          TWILIO_CREDENTIALS_SECRET_ARN:
+            Ref: TwilioCredentialsSecretArn
+      Layers:
+      - Ref: FBPLibLayer
+      - Ref: TwilioLayer
+      Events:
+        StoreSMSVerificationCodePost:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /storeSMSVerificationCode
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        StoreSMSVerificationCodeOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /storeSMSVerificationCode
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+        GetSMSVerificationCodePost:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getSMSVerificationCode
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        GetSMSVerificationCodeOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getSMSVerificationCode
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+        UpdateSMSVerificationPost:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /updateSMSVerification
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        UpdateSMSVerificationOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /updateSMSVerification
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: SMSValidationUtils
+  GetUserStatus:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/9004e510738dac9e4fa8a882b23cb966
+      Handler: GetUserStatus.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        GetUserStatusPost:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getUserStatus
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        GetUserStatusOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getUserStatus
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: GetUserStatus
+  QueryFBPLogs:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/096cabd63984df304c261582c2a6e469
+      Handler: QueryFBPLogs.lambda_handler
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Environment:
+        Variables:
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Events:
+        QueryFBPLogsPost:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /queryFBPLogs
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        QueryFBPLogsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /queryFBPLogs
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: QueryFBPLogs
+  GetSchedule:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/369487d31cf89f5aa8e416fe3e45d51e
+      Handler: GetSchedule.lambda_handler
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Schedule
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Environment:
+        Variables:
+          FBPScheduleTableName:
+            Fn::Sub: ${Year}-Schedule
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Events:
+        GetScheduleGet:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getschedule
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        GetScheduleOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getschedule
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: GetSchedule
+  ResetDBs:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/b401037136dea031797576f293087e29
+      Handler: ResetDBs.lambda_handler
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Picks
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      Environment:
+        Variables:
+          FBPPicksTableName:
+            Fn::Sub: ${Year}-FBP-Picks
+          FBPWeeklyResultsTableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+      Events:
+        ResetDBsGet:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /resetDBs
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        ResetDBsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /resetDBs
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: ResetDBs
+  SendEmail:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/4ca46ef864ac2c1b9b7c6fed118ba91d
+      Handler: SendEmail.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+      Environment:
+        Variables:
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPWeeklyResultsTableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+      Role:
+        Fn::GetAtt:
+        - SendEmailRole
+        - Arn
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        SendEmailPost:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /sendEmail
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        SendEmailOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /sendEmail
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: SendEmail
+  GetStandings:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/55c1d8ba55e0ad4099458e9080ee40e0
+      Handler: GetStandings.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Environment:
+        Variables:
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        GetStandingsGet:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getStandings
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        GetStandingsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getStandings
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: GetStandings
+  GetListForEmail:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/05a10030ad9d04f3bf039a010487d535
+      Handler: GetListForEmail.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Environment:
+        Variables:
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        GetListForEmailPost:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getListForEmail
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        GetListForEmailOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getListForEmail
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: GetListForEmail
+  GetFBPEmailAndDisplayName:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/60fdf02cd8f9fa6dcd005caf8d0f39d3
+      Handler: GetFBPEmailAndDisplayName.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      Environment:
+        Variables:
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        GetFBPEmailAndDisplayNameGET:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getFBPUserEmailAndDisplayName
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        GetFBPEmailAndDisplayNameOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getFBPUserEmailAndDisplayName
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: GetFBPEmailAndDisplayName
+  GetAllFBPEmailAndDisplayName:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/60fdf02cd8f9fa6dcd005caf8d0f39d3
+      Handler: GetFBPEmailAndDisplayName.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      Environment:
+        Variables:
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        GetAllFBPEmailAndDisplayNameGET:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getAllFBPUserEmailAndDisplayName
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        GetAllFBPEmailAndDisplayNameOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getAllFBPUserEmailAndDisplayName
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: GetAllFBPEmailAndDisplayName
+  UpdateWeeklyResults:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-update-weekly-results
+      CodeUri: s3://my-fbp.com/46aff2164854cda10d476016b04bda45
+      Handler: UpdateWeeklyResults.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ''
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Schedule
+      Environment:
+        Variables:
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPPicksTableName:
+            Fn::Sub: ${Year}-FBP-Picks
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPWeeklyResultsTableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+          FBPScheduleTableName:
+            Fn::Sub: ${Year}-Schedule
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        UpdateWeeklyResultsGET:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /updateWeeklyResults
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        UpdateWeeklyResultsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /updateWeeklyResults
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+        UpdateTotalCorrectAndIncorrectPicksGET:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /updateTotalCorrectAndIncorrectPicks
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        UpdateTotalCorrectAndIncorrectPicksOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /updateTotalCorrectAndIncorrectPicks
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: UpdateWeeklyResults
+  CalcWeeklyResults:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-calc-weekly-results
+      CodeUri: s3://my-fbp.com/5e397ac3ad83aee4ca3893af31dab8c1
+      Handler: CalcWeeklyResults.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Picks
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Schedule
+      Environment:
+        Variables:
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPPicksTableName:
+            Fn::Sub: ${Year}-FBP-Picks
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPScheduleTableName:
+            Fn::Sub: ${Year}-Schedule
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        CalcWeeklyResultsGET:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /calcWeeklyResults
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        CalcWeeklyResultsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /calcWeeklyResults
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: CalcWeeklyResults
+  GetWeeklyResults:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/32ae25463fff6c4d95be0ad32b69b362
+      Handler: GetWeeklyResults.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Picks
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ''
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Environment:
+        Variables:
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPPicksTableName:
+            Fn::Sub: ${Year}-FBP-Picks
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPWeeklyResultsTableName:
+            Fn::Sub: ${Year}-FBP-Weekly-Results
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        GetWeeklyResultsGET:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getWeeklyResults
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        GetWeeklyResultsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getWeeklyResults
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: GetWeeklyResults
+  SaveFBPPicks:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-save-fbp-picks
+      CodeUri: s3://my-fbp.com/0f3fa94c6eaad7eb70dc7b8c32b416f9
+      Handler: SaveFBPPicks.lambda_handler
+      Runtime: python3.12
+      Tracing: Active
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Schedule
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Picks
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPPicksTableName:
+            Fn::Sub: ${Year}-FBP-Picks
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        SaveFBPPicksPOST:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /saveFBPPicks
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        SaveFBPPicksOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /saveFBPPicks
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+        ValidateAndFixFBPPicksPOST:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /validateAndFixFBPPicks
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        ValidateAndFixFBPPicksOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /validateAndFixFBPPicks
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: SaveFBPPicks
+  GetPickSheet:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/87a3149e84406851448c76ea47ef7dc2
+      Handler: GetPickSheet.lambda_handler
+      Runtime: python3.12
+      MemorySize: 1024
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Schedule
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPPicksTableName:
+            Fn::Sub: ${Year}-FBP-Picks
+          FBPScheduleTableName:
+            Fn::Sub: ${Year}-Schedule
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        GetPickSheetGET:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getPickSheet
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        GetPickSheetOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getPickSheet
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: GetPickSheet
+  GetPoolOpen:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/1cd1b5791757d44535fbf7905c7d9055
+      Handler: GetPoolOpen.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          Year:
+            Ref: Year
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        GetPoolOpen:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getPoolOpen
+            Method: GET
+        GetPoolOpenOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getPoolOpen
+            Method: OPTIONS
+    Metadata:
+      SamResourceId: GetPoolOpen
+  GetPoolConfig:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/1cd1b5791757d44535fbf7905c7d9055
+      Handler: GetPoolConfig.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          Year:
+            Ref: Year
+      Events:
+        GetPoolConfig:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getPoolConfig
+            Method: GET
+    Metadata:
+      SamResourceId: GetPoolConfig
+  MyHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+        - '*'
+        AllowHeaders:
+        - Content-Type
+        - X-Amz-Date
+        - Authorization
+        - X-Api-Key
+        - X-Amz-Security-Token
+        AllowMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+        MaxAge: 300
+        AllowCredentials: false
+    Metadata:
+      SamResourceId: MyHttpApi
+  SetPoolStatusOpen:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/0d30aeeb87828ea44243ab2ed88d8fc2
+      Handler: SetPoolStatus.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        SetPoolStatusOpenPOST:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /setPoolStatusOpen
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        SetPoolStatusOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /setPoolStatusOpen
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: SetPoolStatusOpen
+  SetPoolStatusClosed:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-set-pool-status-closed
+      CodeUri: s3://my-fbp.com/0d30aeeb87828ea44243ab2ed88d8fc2
+      Handler: SetPoolStatus.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      Environment:
+        Variables:
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        SetPoolStatusClosedPOST:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /setPoolStatusClosed
+            Method: POST
+            PayloadFormatVersion: '2.0'
+        SetPoolStatusClosedOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /setPoolStatusClosed
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: SetPoolStatusClosed
+  GetFBPUser:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/c0fbf08c4c080fe50b1069448b598a46
+      Handler: GetFBPUser.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      Environment:
+        Variables:
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Events:
+        GetFBPUser:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getFBPUserPython
+            Method: POST
+            PayloadFormatVersion: '2.0'
+      Layers:
+      - Ref: FBPLibLayer
+    Metadata:
+      SamResourceId: GetFBPUser
+  UpdateFBPUserPython:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/81d9553a9fef9bfdbf6e7b3e05987ef8
+      Handler: AddOrUpdateFBPUser.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Picks
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      Environment:
+        Variables:
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          FBPPicksTableName:
+            Fn::Sub: ${Year}-FBP-Picks
+      Events:
+        UpdateFBPUserPython:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /updateFBPUser
+            Method: POST
+            PayloadFormatVersion: '2.0'
+      Layers:
+      - Ref: FBPLibLayer
+    Metadata:
+      SamResourceId: UpdateFBPUserPython
+  AddFBPUser:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/81d9553a9fef9bfdbf6e7b3e05987ef8
+      Handler: AddOrUpdateFBPUser.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Picks
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      Environment:
+        Variables:
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPPicksTableName:
+            Fn::Sub: ${Year}-FBP-Picks
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Events:
+        AddFBPUser:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /addFBPUser
+            Method: POST
+            PayloadFormatVersion: '2.0'
+      Layers:
+      - Ref: FBPLibLayer
+    Metadata:
+      SamResourceId: AddFBPUser
+  GetFBPPicks:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/9c5ed362a933277db31d0f5c24ee66f5
+      Handler: GetFBPPicks.lambda_handler
+      Runtime: python3.12
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Picks
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      Environment:
+        Variables:
+          FBPPicksTableName:
+            Fn::Sub: ${Year}-FBP-Picks
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+      Layers:
+      - Ref: FBPLibLayer
+      Events:
+        GetFBPPicks:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getFBPPicksPython
+            Method: POST
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      SamResourceId: GetFBPPicks
+  GetAllFBPPicks:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://my-fbp.com/74202ec7a3921fa925bdb9fd0d1a59ab
+      Handler: GetAllFBPPicks.lambda_handler
+      Runtime: python3.12
+      Layers:
+      - Ref: FBPLibLayer
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Picks
+      - DynamoDBCrudPolicy:
+          TableName:
+            Fn::Sub: ${Year}-Log
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Users
+      - DynamoDBReadPolicy:
+          TableName:
+            Fn::Sub: ${Year}-FBP-Config
+      - Statement:
+        - Effect: Allow
+          Action: lambda:InvokeFunction
+          Resource:
+            Fn::GetAtt:
+            - GetPoolConfig
+            - Arn
+      Environment:
+        Variables:
+          FBPPicksTableName:
+            Fn::Sub: ${Year}-FBP-Picks
+          FBPLogsTableName:
+            Fn::Sub: ${Year}-Log
+          FBPUsersTableName:
+            Fn::Sub: ${Year}-FBP-Users
+          FBPConfigTableName:
+            Fn::Sub: ${Year}-FBP-Config
+          GET_POOL_CONFIG_FUNCTION:
+            Ref: GetPoolConfig
+      Events:
+        GetAllFBPPicks:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getAllFBPPicks
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        GetAllFBPPicksOptions:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: FBPHttpApi
+            Path: /getAllFBPPicks
+            Method: OPTIONS
+    Metadata:
+      SamResourceId: GetAllFBPPicks
+Outputs:
+  HttpAPiUrl:
+    Description: URL of the HTTP API gateway
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-HttpApiUrl
+  HttpApiId:
+    Description: HTTP API ID
+    Value:
+      Ref: FBPHttpApi
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-HttpApiId
+  HtmlToPdfFunctionName:
+    Description: Name of the HtmlToPdf Lambda function
+    Value:
+      Ref: HTMLtoPDF
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-HtmlToPdf
+  HtmlToPdfEndpoint:
+    Description: Endpoint for the HtmlToPdf API
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/htmlToPdf
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-HtmlToPdfEndpoint
+  ChatBotFunctionName:
+    Description: Name of the ChatBot Lambda function
+    Value:
+      Ref: ChatBot
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-ChatBot
+  ChatBotEndpoint:
+    Description: Endpoint for the ChatBot API
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/chatbot
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-ChatBotEndpoint
+  ChatBotSyncFunctionName:
+    Description: Name of the ChatBotSync Lambda function
+    Value:
+      Ref: ChatBotSync
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-ChatBotSync
+  ChatBotSyncEndpoint:
+    Description: Endpoint for the ChatBotSync API
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/chatbotsync
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-ChatBotSyncEndpoint
+  ImportSpreadsAndFinalScoresFunctionName:
+    Description: Name of the ImportSpreadsAndFinalScores Lambda function
+    Value:
+      Ref: ImportSpreadsAndFinalScores
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-ImportSpreadsAndFinalScores
+  ImportSpreadsAndFinalScoresEndpoint:
+    Description: Endpoint for the ImportSpreadsAndFinalScores API
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/importSpreadsAndFinalScores
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-ImportSpreadsAndFinalScoresEndpoint
+  AdvancedMessagingServiceFunctionName:
+    Description: Name of the AdvancedMessagingService Lambda function
+    Value:
+      Ref: AdvancedMessagingService
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-AdvancedMessagingService
+  AdvancedMessagingServiceEndpoint:
+    Description: Endpoint for the AdvancedMessagingService API
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/advanced-messaging
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-AdvancedMessagingEndpoint
+  AdvancedSMSServiceFunctionName:
+    Description: Name of the AdvancedSMSService Lambda function (retained until AdvancedMessagingService
+      is verified)
+    Value:
+      Ref: AdvancedSMSService
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-AdvancedSMSService
+  AdvancedSMSServiceEndpoint:
+    Description: Endpoint for the AdvancedSMSService API (retained until AdvancedMessagingService
+      is verified)
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/advancedSMSService
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-AdvancedSMSEndpoint
+  TwilioWebhookEndpoint:
+    Description: Endpoint for the TwilioWebhook API
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/twilio-webhook
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-twilio-webhook-endpoint
+  SMSVerificationFunctionName:
+    Description: Name of the SMSValidationUtils Lambda function
+    Value:
+      Ref: SMSValidationUtils
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-SMSVerificationCodeFunctionName
+  SMSStoreVerificationCodeEndpoint:
+    Description: Endpoint for sending SMS verification codes
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/storeSMSVerificationCode
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-SMSStoreVerificationCodeEndpoint
+  SMSGetVerificationCodeEndpoint:
+    Description: Endpoint for sending SMS verification codes
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getSMSVerificationCode
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-SMSGetVerificationCodeEndpoint
+  SMSUpdateVerificationCodeEndpoint:
+    Description: Endpoint for updating SMS verification status
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/updateSMSVerification
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-SMSUpdateVerificationCodeEndpoint
+  GetTeamRecordsEndpoint:
+    Description: Endpoint for the GetTeamRecords API
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getTeamRecords
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetTeamRecordsEndpoint
+  FBPPayoutLedgerFunctionName:
+    Description: Name of the FBP Payout Ledger Lambda function
+    Value:
+      Ref: FBPPayoutLedger
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-FBPPayoutLedgerFunctionName
+  FBPLedgerApiBaseUrl:
+    Description: Base URL of the FBP Ledger API
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-FBPLedgerApiBaseUrl
+  FBPLedgerGetEndpoint:
+    Description: GET endpoint for FBP Ledger
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getFBPLedger
+  FBPLedgerDepositEndpoint:
+    Description: POST endpoint for deposits
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/deposit
+  FBPLedgerPayoutEndpoint:
+    Description: POST endpoint for payouts
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/payout
+  GetUserStatusFunctionName:
+    Description: Name of the GetUserStatus Lambda function
+    Value:
+      Ref: GetUserStatus
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetUserStatusFunctionName
+  GetUserStatusApi:
+    Description: URL of the GetUserStatus API endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getUserStatus
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetUserStatusApi
+  GetScheduleFunctionName:
+    Description: Name of the GetSchedule Lambda function
+    Value:
+      Ref: GetSchedule
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetScheduleFunctionName
+  GetScheduleApi:
+    Description: URL of the GetSchedule API endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getschedule
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetScheduleApi
+  QueryFBPLogsFunctionName:
+    Description: Name of the QueryFBPLogs Lambda function
+    Value:
+      Ref: QueryFBPLogs
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-QueryFBPLogsFunctionName
+  QueryFBPLogsApi:
+    Description: URL of the QueryFBPLogs API endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/queryFBPLogs
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-QueryFBPLogsApi
+  EmailForwardingName:
+    Description: Name of the email forwarding Lambda function
+    Value:
+      Ref: EmailForwarding
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-EmailForwardingName
+  AdvancedEmailServiceName:
+    Description: Name of the Advanced Email Service Lambda function (retained until
+      AdvancedMessagingService is verified)
+    Value:
+      Ref: AdvancedEmailService
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-AdvancedEmailService
+  AdvancedEmailServiceApi:
+    Description: URL of the Advanced Email Service API endpoint (retained until AdvancedMessagingService
+      is verified)
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/advancedEmailService
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-AdvancedEmailServiceApi
+  SendEmailApi:
+    Description: SendEmail API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/sendEmail
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-SendEmailApi
+  GetStandingsApi:
+    Description: GetStandings API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getStandings
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetStandingsApi
+  GetListForEmailApi:
+    Description: GetListOfEmails API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getListForEmail
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetListForEmailApi
+  GetAllFBPEmailAndDisplayNameApi:
+    Description: GetAllFBPEmailAndDisplayName API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getAllFBPUserEmailAndDisplayName
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetAllFBPEmailAndDisplayNameApi
+  GetFBPEmailAndDisplayNameApi:
+    Description: GetFBPEmailAndDisplayName API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getFBPUserEmailAndDisplayName
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetFBPEmailAndDisplayNameApi
+  GetWeeklyResultsApi:
+    Description: GetWeeklyResults API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getWeeklyResults
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetWeeklyResultsApi
+  CalcWeeklyResultsApi:
+    Description: CalcWeeklyResults API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/calcWeeklyResults
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-CalcWeeklyResultsApi
+  SaveFBPPicksApi:
+    Description: SaveFBPPicks API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/saveFBPPicks
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-SaveFBPPicksApi
+  GetPickSheetApi:
+    Description: GetPickSheet API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getPickSheetPython
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetPickSheetApi
+  GetFBPPicksApi:
+    Description: GetFBPPicks API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getFBPPicksPython
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetFBPPicksApi
+  GetPoolOpenApi:
+    Description: GetPoolOpen API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getPoolOpen
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetPoolOpenApi
+  SetPoolStatusOpenApi:
+    Description: SetPoolStatusOpen API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/setPoolStatusOpen
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-SetPoolStatusApi
+  SetPoolStatusClosedApi:
+    Description: SetPoolStatusClosed API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/setPoolStatusClosed
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-SetPoolStatusClosedApi
+  GetFBPUserEndpoint:
+    Description: GetFBPUser API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/getFBPUserPython
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetFBPUserHttpApi
+  GetAllFBPPicksEndpoint:
+    Description: GetAllFBPPicks API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/getAllFBPPicks
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-GetAllFBPPicksHttpApi
+  UpdateFBPUserPythonEndpoint:
+    Description: UpdateFBPUserPython API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/updateFBPUser
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-AddOrUpdateFBPUserPythonHttpApi
+  AddFBPUserEndpoint:
+    Description: AddFBPUser API Endpoint
+    Value:
+      Fn::Sub: https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/addFBPUser
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-AddFBPUserHttpApi
