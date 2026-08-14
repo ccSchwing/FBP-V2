@@ -39,7 +39,7 @@ def parse_pool_open(value):
 # If create_next_week is False, this function will update the poolOpen value for the current week.
 # If create_next_week is True, this function will create a new entry for the next week
 def _set_pool_status(create_next_week, poolAction, forced_pool_open=None):
-    config_table_name = os.environ.get('FBP_CONFIG_TABLE_NAME', 'FBP-Config')
+    config_table_name = os.environ.get('FBPConfigTableName', '2026-FBP-Config')
     week_number = None
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table(config_table_name)

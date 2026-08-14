@@ -7,19 +7,7 @@
     <script src="/js-lib/oidc-client-ts.min.js"></script>
     <link rel="stylesheet" type="text/css" href="/css/styles.css" />
     <link rel="icon" type="image/png" href="/icon-blue-32.png" />
-    <!-- <script type="module">
-        (async () => {
-            const { auth } = await import("/js/auth.js");
-            await auth.ensureAuthenticated();
-            const user = await auth.getUser();
-            console.log("Authenticated user:", user);
-            window.user = user;
 
-            // Now call getUserStatus after user is loaded
-            const { getUserStatus } = await import("/js-lib/userUtils.js");
-            await getUserStatus();
-        })().catch(console.error);
-    </script> -->
     <title>FBP FAQ</title>
 
     <style>
@@ -291,6 +279,20 @@
 
         <div id="faq-list" class="faq__grid">
             <details class="faq__item">
+                <summary class="faq__question" tabindex="0">How much does FBP cost?</summary>
+                <div class="faq__answer">
+                    <p>
+                        The cost for FBP is $20 for the full season. Preseason is free of charge so
+                        that you have an opportunity to participate and get familiar with the
+                        platform before committing to the full season.
+                        After Week 1, if you have not yet paid you will be redirected to the payment page.
+                        Currently, VenMo and PayPal are supported payment methods. Should you need another
+                        payment method, contact us at <a href="mailto:fbpadmin@my-fbp.com">fbpadmin@my-fbp.com</a>
+                        and we will work with you to accommodate your needs.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
                 <summary class="faq__question" tabindex="0">Is My Personal Information Secure?</summary>
                 <div class="faq__answer">
                     <p>Your personal information is secure with FBP.
@@ -300,6 +302,17 @@
                         and we follow best practices for data security.
                         For more details, please refer to our <a href="https://my-fbp.com/privacy.html"><b>Privacy
                                 Policy</b></a>.
+                    </p>
+                </div>
+            </details>
+            <details class="faq__item">
+                <summary class="faq__question" tabindex="0">Does FBP Operate At A Profit?</summary>
+                <div class="faq__answer">
+                    <p>
+                    No.  FBP pays out to it's players every penny taken in, and does not operate for profit.
+                    FBP is hosted on the Amazon Web Services (AWS) cloud platform,
+                    ensuring high availability and robust security for all user data.  The cost of AWS is absorbed
+                    by FBP, further demonstrating that FBP does not operate for profit.
                     </p>
                 </div>
             </details>
@@ -320,9 +333,10 @@
                 </div>
             </details>
             <details class="faq__item">
-                <summary class="faq__question" tabindex="0">ChatBot Tip</summary>
+                <summary class="faq__question" tabindex="0">FBP Assistant</summary>
                 <div class="faq__answer">
-                    <p>FBP does have a chatbot feature that can only answer questions related to FBP.
+                    <p>FBP does have a chatbot feature that can only answer questions related to FBP. The FBP
+                        Assistant appears on every page in the bottom right corner.
                         You can ask it questions about FBP, and it will provide you with relevant information.
                         For example, you ask it about a specific NFL team, and it will provide you with information
                         about that teams' record as the Favorite and as the Underdog. You can just type in "Bills"
@@ -344,17 +358,6 @@
                 </div>
             </details>
             <details class="faq__item">
-                <summary class="faq__question" tabindex="0">How Do I Make Payment for the FBP Pool?</summary>
-                <div class="faq__answer">
-                    <p>You can contact FBP Admin by email at <a
-                            href="mailto:fbpadmin@my-fbp.com"><b>fbpadmin@my-fbp.com</b></a>.
-                        We will do our best to respond to your inquiry as quickly as possible.
-                        Payment can be made via Venmo or PayPal. Please visit our <a
-                            href="https://my-fbp.com/makepayment.html"><b>FBP Payment Page</b></a>.
-                    </p>
-                </div>
-            </details>
-            <details class="faq__item">
                 <summary class="faq__question" tabindex="0">How Do I Contact FBP If I Have Questions?</summary>
                 <div class="faq__answer">
                     <p>You can contact FBP Admin by email at <a
@@ -370,7 +373,9 @@
                         That is a bit of a problem. Your email address is used internally by FBP to keep track of your
                         overall account data: wins, losses, picks, etc. At this point, the only thing we can say is that
                         we will need to look into the issue further to determine if it is possible to change your
-                        email address without losing your account data.
+                        email address without losing your account data. It's best to use a personal
+                        email address that you plan to keep for the long term. Business email addresses
+                        can change or you may change jobs.
                     </p>
                 </div>
             </details>
@@ -393,21 +398,21 @@
                 </div>
             </details>
             <details class="faq__item">
-                <summary class="faq__question" tabindex="0">How Do I Set My FBP Profile?</summary>
-                <div class="faq__answer">
-                    <p>The "Update My Profile" link is on every page in the FBP website.
-                        Click that link and you'll see a form where you can set your First and Last Names,
-                        your Display Name, and your options to receive emails and/or text messages
-                        for Reminders and Grid Sheet
-                        availablity. You also set a default algorithm that will be used to make your picks
-                        if you don't make picks on any given week. You also can set a default Monday Night
-                        Tiebreaker value that will be used if you don't set a tiebreaker value for any given week.
-                        Your email address is never shown to other users, but it is used by FBP Admin to
-                        send you your weekly grid sheet and reminders if you have those options enabled.
-                        Don't forget to click the "Update Profile" button at the bottom of the page to save
-                        your profile information.
-                    </p>
-                </div>
+            <summary class="faq__question" tabindex="0">How Do I Set My FBP Profile?</summary>
+            <div class="faq__answer">
+                <p>The "Update My Profile" link is on every page in the FBP website.
+                    Click that link and you'll see a form where you can set your First and Last Names,
+                    your Display Name, and your options to receive emails and/or text messages
+                    for Reminders and Grid Sheet
+                    availablity. You also set a default algorithm that will be used to make your picks
+                    if you don't make picks on any given week. You also can set a default Monday Night
+                    Tiebreaker value that will be used if you don't set a tiebreaker value for any given week.
+                    Your email address is never shown to other users, but it is used by FBP Admin to
+                    send you your weekly grid sheet and reminders if you have those options enabled.
+                    Don't forget to click the "Update Profile" button at the bottom of the page to save
+                    your profile information.
+                </p>
+            </div>
             </details>
             <details class="faq__item">
                 <summary class="faq__question" tabindex="0">How Do I Set My Email and Text Messaging Preferences?
@@ -504,11 +509,12 @@
                 <div class="faq__answer">
                     <p>The spread is the point difference set by oddsmakers to even the playing field
                         between two teams. For example, if Team A is favored to win by 7.5 points over Team B,
-                        the spread would be -7.5 for Team A and +7.5 for Team B. The winner with the spread is
+                        the spread would be +7.5 for Team B. The winner with the spread is
                         determined by adding the spread to the final score of the game.
                         If you pick Team A, they would need to win by more than 7.5 points for
                         you to win with your pick. If you pick Team B, they would need to lose by
-                        less than 7.5 points or win the game outright for you to win with your pick.
+                        less than 7.5 points or win the game outright for you to win with your pick. The
+                        .5 in the spread ensures that there is no tie when determining the winner with the spread.
                     </p>
                 </div>
             </details>
@@ -602,7 +608,8 @@
                         However, we are open to new players joining the fun. If you have friends who are interested in
                         joining FBP,
                         please have them contact FBP Admin at <a
-                            href="mailto:fbpadmin@my-fbp.com"><b>fbpadmin@my-fbp.com</b></a>.
+                            href="mailto:fbpadmin@my-fbp.com"><b>fbpadmin@my-fbp.com</b></a> and we will
+                        work with you.
                     </p>
                 </div>
             </details>
@@ -610,13 +617,18 @@
                 <summary class="faq__question" tabindex="0">What do you get if you are the winner for the week?
                 </summary>
                 <div class="faq__answer">
-                    <p>The exact amount of the winnings are still TBD.
+                    <p>If there are at least 18 paid players, the payout will be $20 for the weekly winner.  This
+                        is because there are 18 weeks in the NFL season.  If there are at least 20 paid players,
+                        the payout will still be $20 for the weekly winner as there are two consolation prizes
+                        awarded at the end of the season. Obviously, if there are more than 20 paid players,
+                        the payout will be higher than the original $20 paid when you joined FBP.
                     </p>
                     <p>
-                        At the end of the season, at least two additional prizes will be awarded:
+                        If there are at least 20 paid players, at the end of the season, two
+                        additional prizes will be awarded:
                     <ul>
-                        <li>A prize will be awarded to the player with the most correct picks who did
-                            not have an overall win for the week.
+                        <li>A prize will be awarded to the player with the most correct picks over the course
+                            of the season who did not have a win for any week.
                         </li>
                         <li>A prize will also be awarded to the player who finishes with the most incorrect picks.</li>
                     </ul>

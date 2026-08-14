@@ -154,7 +154,7 @@ def validateAndFixFBPPicks():
         }
     tracer.put_annotation(key="week", value=str(week))
     logger.info(f"Validating and fixing picks for week: {week}")
-    FBP_SCHEDULE_TABLE_NAME = os.environ.get('FBPScheduleTableName', '2025-Schedule')
+    FBP_SCHEDULE_TABLE_NAME = os.environ.get('FBPScheduleTableName', '2026-Schedule')
     # need to query the schedule table for the week so that I can get the number
     # of games for that week and use it as a limit for the picks string.
     scheduleTable = dynamodb.Table(FBP_SCHEDULE_TABLE_NAME)

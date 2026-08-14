@@ -20,7 +20,7 @@ logger.setLevel(logging.INFO)
 # 2. Is the user's account locked?
 
 USERS_TABLE_NAME = os.environ.get('FBPUsersTableName', 'FBP-Users')
-LOGS_TABLE_NAME = os.environ.get('FBPLogsTableName', '2025-Log')
+LOGS_TABLE_NAME = os.environ.get('FBPLogsTableName', '2026-Log')
 
 userTable = boto3.resource('dynamodb').Table(USERS_TABLE_NAME)
 logTable = boto3.resource('dynamodb').Table(LOGS_TABLE_NAME)

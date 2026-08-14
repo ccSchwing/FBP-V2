@@ -717,6 +717,7 @@ Resources:
         Variables:
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
           FBPLogsTableName: !Sub "${Year}-Log"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
           SetPoolStatusClosed: !Ref SetPoolStatusClosed # Close pool for the week. This is the last thing done.
           SaveFBPPicks: !Ref SaveFBPPicks # Validate user picks
           ##

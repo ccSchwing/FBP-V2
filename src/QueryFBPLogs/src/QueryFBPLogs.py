@@ -16,7 +16,7 @@ logger.setLevel(logging.INFO)
 
 
 CONFIG_TABLE_NAME = os.environ.get("FBPConfigTableName", "FBP-Config")
-LOGS_TABLE_NAME = os.environ.get("FBPLogsTableName", "2025-Log")
+LOGS_TABLE_NAME = os.environ.get("FBPLogsTableName", "2026-Log")
 logger.info(
     f"Using DynamoDB tables - Config: {CONFIG_TABLE_NAME}, Logs: {LOGS_TABLE_NAME}"
 )

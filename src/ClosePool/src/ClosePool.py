@@ -91,6 +91,11 @@ def closePool():
                     f"Pool is currently open for week {current_week}. Proceeding with closing the pool for the current week.",
                     "INFO",
                 )
+                configTable.update_item(
+                    Key={"Week": current_week},
+                    UpdateExpression="SET poolOpen = :open",
+                    ExpressionAttributeValues={":open": False},
+                )
         else:
             logging.error(f"Configuration for current week {current_week} not found.")
             fbpLog(

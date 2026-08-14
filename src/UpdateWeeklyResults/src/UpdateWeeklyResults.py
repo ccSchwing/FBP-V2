@@ -253,7 +253,7 @@ def updateWeeklyUserResults(allUserPicks: List[Dict[str, Any]], resultsTable, us
     # If we get here, it's safe to proceed.
     ##
 
-    FBP_SCHEDULE_TABLE_NAME = os.environ.get('FBPScheduleTableName', '2025-Schedule')
+    FBP_SCHEDULE_TABLE_NAME = os.environ.get('FBPScheduleTableName', '2026-Schedule')
     logger.info(f"Using FBP Schedule DynamoDB table: {FBP_SCHEDULE_TABLE_NAME}")
     scheduleTable = dynamodb.Table(FBP_SCHEDULE_TABLE_NAME)
     scheduleResults = scheduleTable.scan(
