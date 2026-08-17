@@ -350,7 +350,7 @@
         "port": 5678
       },
       "preLaunchTask": "Attach to GetAllFBPPicks",
-      "postDebugTask": "Cleanup",
+      "postDebugTask": "Cleanup and Stop Colima",
       "pathMappings": [
         {
           "localRoot": "${workspaceFolder}/src/GetAllFBPPicks/src",
