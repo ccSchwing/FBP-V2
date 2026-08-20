@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (healthFlowStage && healthFlowStage.startsWith("pending-callback")) {
         window.location.href = "/auth-health.html?stage=callback"
       } else {
-        window.location.href = "fbp-home.html"
+        window.location.href = "index.html"
       }
     } else {
       // Display error

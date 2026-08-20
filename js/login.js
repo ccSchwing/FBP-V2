@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     loginMessage.classList.add("success")
     alert("In login.js - User already authenticated, redirecting to FBP Home")
     setTimeout(() => {
-      window.location.href = "fbp-home.html"
+      window.location.href = "index.html"
     }, 2000)
   } else {
     // Set up login button

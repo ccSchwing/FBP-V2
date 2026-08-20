@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (isAuthenticated) {
       loginButton.textContent = "Go to FBP Home"
       loginButton.onclick = () => {
-        window.location.href = "https://fbp-home.html"
+        window.location.href = "https://index.html"
       }
     } else {
       loginButton.textContent = "Login"
