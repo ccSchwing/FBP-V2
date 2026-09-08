@@ -303,7 +303,7 @@ export function initPhoneVerification({ resolveUserEmail } = {}) {
       });
       boundAny = true;
     } else {
-      console.warn("Phone verification: mobile input not found.");
+      console.info("Phone verification: mobile input not found.");
     }
 
     if (sendButton) {
@@ -313,7 +313,7 @@ export function initPhoneVerification({ resolveUserEmail } = {}) {
       });
       boundAny = true;
     } else {
-      console.warn("Phone verification: send verification button not found.");
+      console.info("Phone verification: send verification button not found.");
     }
 
     if (verifyButton) {
@@ -323,7 +323,7 @@ export function initPhoneVerification({ resolveUserEmail } = {}) {
       });
       boundAny = true;
     } else {
-      console.warn("Phone verification: verify button not found.");
+      console.info("Phone verification: verify button not found.");
     }
 
     listenersBound = boundAny;

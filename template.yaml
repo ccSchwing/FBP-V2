@@ -109,7 +109,7 @@ Parameters:
   DataSourceId:
     Type: String
     Description: ID of the Bedrock data source
-    Default: LULFE6CQPM
+    Default: Z9UNQIU5QX
 
 Resources:
   FBPHttpApi:
@@ -2091,7 +2091,7 @@ Outputs:
     Export:
       Name: !Sub ${AWS::StackName}-ChatBotEndpoint
   ChatBotSyncFunctionName:
-    Description: Name of the ChatBotSync Lambda function
+    Description: ChatbotSync Lambda function name
     Value: !Ref ChatBotSync
     Export:
       Name: !Sub ${AWS::StackName}-ChatBotSync

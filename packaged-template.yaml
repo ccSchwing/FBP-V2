@@ -67,7 +67,7 @@ Parameters:
   DataSourceId:
     Type: String
     Description: ID of the Bedrock data source
-    Default: LULFE6CQPM
+    Default: Z9UNQIU5QX
 Resources:
   FBPHttpApi:
     Type: AWS::Serverless::HttpApi
