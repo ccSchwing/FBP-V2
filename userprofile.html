@@ -119,6 +119,32 @@
       width: 11ch;
       min-width: 11ch;
     }
+
+    .profile-text-field {
+      margin-bottom: 1.25rem;
+    }
+
+    .profile-text-field label {
+      display: block;
+      margin-bottom: 0.25em;
+      font-weight: 500;
+    }
+
+    .profile-text-field input {
+      box-sizing: border-box;
+      width: min(100%, 20rem);
+      padding: 0.65rem 0.8rem;
+      border: 1px solid #cfd7e3;
+      border-radius: 10px;
+      background: #fff;
+      font: inherit;
+    }
+
+    .profile-text-field input:focus-visible {
+      outline: 2px solid #1f8f3a;
+      outline-offset: 2px;
+      border-color: #1f8f3a;
+    }
   </style>
 
   <link rel="stylesheet" type="text/css" href="/css/styles.css" />
@@ -141,11 +167,13 @@
     import { getServiceUrl } from "/js-lib/urlConfig.js";
 
     let email = null;
+    /*
     let originalMobileNumberDigits = "";
 
     function normalizePhoneDigits(value) {
       return (value || "").toString().replace(/\D/g, "").slice(0, 10);
     }
+    */
 
     async function resolveUserEmail() {
       if (email) return email;
@@ -216,12 +244,15 @@
       paymentRadioButtons.forEach((radio) => {
         radio.checked = radio.value === paymentMethod;
       });
+      // Comment out entire SMS Notifications Section
+      /*
       document.getElementById("smsReminder").checked =
         responseBody.smsReminder || false;
       document.getElementById("smsPickSheet").checked =
         responseBody.smsPickSheet || false;
       document.getElementById("smsGridSheet").checked =
         responseBody.smsGridSheet || false;
+      */
       document.getElementById("emailPickSheet").checked =
         responseBody.emailPickSheet || false;
       document.getElementById("emailReminders").checked =
@@ -237,9 +268,11 @@
       });
       document.getElementById("defaultTieBreaker").value =
         responseBody.defaultTieBreaker || "";
+      /*
       const savedMobileNumber = responseBody.mobile_number || "";
       originalMobileNumberDigits = normalizePhoneDigits(savedMobileNumber);
       document.getElementById("MobileNumber").value = formatPhoneNumber(savedMobileNumber);
+      */ 
     }
 
     async function validateFormData() {
@@ -292,6 +325,8 @@
       try {
         const lambdaURL = await getServiceUrl("updateFBPUserPython");
         const formData = new FormData(document.forms.addFBPUser);
+        /* Comment out entire SMS Notifications Section */
+        /*
         const mobileNumberDigits = (formData.get("MobileNumber") || "")
           .toString()
           .replace(/\D/g, "")
@@ -300,6 +335,7 @@
           alert("Mobile number changes must be verified first. Use 'Text Me A Verification Code' and then 'Verify' before saving your profile.");
           return;
         }
+        */
         const resolvedEmail = await resolveUserEmail();
         if (!resolvedEmail) {
           throw new Error("No authenticated user email found for update");
@@ -330,9 +366,11 @@
           emailPickSheet: formData.get("emailPickSheet") === "on",
           emailReminders: formData.get("emailReminders") === "on",
           emailGridSheet: formData.get("emailGridSheet") === "on",
+          /*
           smsReminder: formData.get("smsReminder") === "on",
           smsPickSheet: formData.get("smsPickSheet") === "on",
           smsGridSheet: formData.get("smsGridSheet") === "on",
+          */
           defaultAlgorithm:
             document.querySelector('input[name="defaultAlgorithm"]:checked')
               ?.value || "",
@@ -413,17 +451,17 @@
       <form name="addFBPUser" autocomplete="off" data-lpignore="true">
         <input type="text" name="fake-username" autocomplete="username" tabindex="-1" aria-hidden="true"
           style="position: absolute; left: -9999px" />
-        <div>
+        <div class="profile-text-field">
           <label for="firstName">First Name:</label>
           <input type="text" name="firstName" id="firstName" autocomplete="off" autocorrect="off" autocapitalize="off"
             spellcheck="false" data-lpignore="true" />
         </div>
-        <div>
+        <div class="profile-text-field">
           <label for="lastName">Last Name:</label>
           <input type="text" name="lastName" id="lastName" autocomplete="off" autocorrect="off" autocapitalize="off"
             spellcheck="false" data-lpignore="true" />
         </div>
-        <div>
+        <div class="profile-text-field">
           <label for="displayName">Display Name:</label>
           <input type="text" name="displayName" id="displayName" />
         </div>
@@ -473,7 +511,11 @@
                 <span>Email Gridsheet</span>
               </span>
             </label>
+          </div>
         </div>
+        <!-- SMS Notifications Section  -->
+        <!-- Comment out entire SMS Notifications Section -->
+        <!--
         <section id="smsOptin" class="phone-verification-card" aria-labelledby="mobileVerificationTitle">
           <div class="phone-verification-header">
             <label id="mobileVerificationTitle" class="phone-verification-title" for="MobileNumber">Mobile
@@ -524,6 +566,7 @@
             </label>
           </div>
         </div>
+        -->
         <div id="defaultAlgorithm" style="display: flex; flex-direction: column; gap: 0.5em; margin-bottom: 1.25rem;">
           <label for="DefaultAlgorithm" style="margin-bottom:0.25em; font-weight:500;">Default for Picks when you
             don't make picks:</label>
@@ -614,11 +657,13 @@
             radioButtons.forEach((radio) => {
               radio.checked = radio.value === defaultAlgorithm;
             });
+            /*
             document.getElementById("MobileNumber").value =
               formatPhoneNumber(responseBody.mobile_number || "");
             originalMobileNumberDigits = normalizePhoneDigits(
               responseBody.mobile_number || "",
             );
+            */
           });
         }
       </script>
