@@ -1,6 +1,7 @@
 import boto3
 import pandas as pd
 import os
+import shutil
 import json
 from datetime import datetime
 from decimal import Decimal
@@ -42,7 +43,7 @@ def export_dynamodb_to_kb(event, context):
         
         # Step 2: Upload CSVs to S3
         upload_csvs_to_s3(csv_files)
-        
+
         # Step 3: Trigger KB sync
         sync_knowledge_base()
         

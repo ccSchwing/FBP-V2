@@ -390,7 +390,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub ${AWS::StackName}-chatbotsync
-      CodeUri: src/ChatBotSync/src/
+      CodeUri: ./src/ChatBotSync/src/
       Handler: ChatBotSync.export_dynamodb_to_kb
       Runtime: python3.12
       Layers:
