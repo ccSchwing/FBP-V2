@@ -1609,6 +1609,49 @@ Resources:
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
 
+  CalcPartialResults:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-calc-partial-results
+      CodeUri: src/CalcPartialResults/src/
+      Handler: CalcPartialResults.lambda_handler
+      Runtime: python3.12
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBP-Users"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-Log"
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-FBP-Picks"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBP-Config"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-Schedule"
+      Environment:
+        Variables:
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
+      Layers:
+        - !Ref FBPLibLayer
+      Events:
+        CalcPartialResultsGET:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /calcPartialResults
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        CalcPartialResultsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /calcPartialResults
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+
   GetWeeklyResults:
     Type: AWS::Serverless::Function
     Properties:
