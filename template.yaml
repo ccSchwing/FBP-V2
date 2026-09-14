@@ -1566,6 +1566,51 @@ Resources:
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
 
+  
+  UpdatePartialWeeklyResults:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-update-partial-weekly-results
+      CodeUri: src/UpdatePartialWeeklyResults/src/
+      Handler: UpdatePartialWeeklyResults.lambda_handler
+      Runtime: python3.12
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBP-Config"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBP-Users"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-Log"
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-Schedule"
+      Environment:
+        Variables:
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
+      Layers:
+        - !Ref FBPLibLayer
+      Events:
+        UpdatePartialWeeklyResultsGET:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /updatePartialWeeklyResults
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        UpdatePartialWeeklyResultsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /updatePartialWeeklyResults
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+
   CalcWeeklyResults:
     Type: AWS::Serverless::Function
     Properties:

@@ -53,6 +53,23 @@
       ]
     },
     {
+      "name": "Python: Attach to UpdatePartialWeeklyResults",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Debug UpdatePartialWeeklyResults",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/UpdatePartialWeeklyResults/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },
+    {
       "name": "Python: Local Invoke and Debug GetStandings",
       "type": "debugpy",
       "request": "attach",
