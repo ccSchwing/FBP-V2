@@ -315,6 +315,33 @@ manifest_hash = ""
 packagetype = "Zip"
 functions = ["GetAllFBPPicks"]
 
+[function_build_definitions.fe56090d-f141-493c-acf5-a1307ac591c8]
+codeuri = "/Users/ccs/projects/FBP/src/UpdatePartialWeeklyResults/src"
+runtime = "python3.12"
+architecture = "arm64"
+handler = "UpdatePartialWeeklyResults.lambda_handler"
+manifest_hash = ""
+packagetype = "Zip"
+functions = ["UpdatePartialWeeklyResults"]
+
+[function_build_definitions.318957fd-8be5-432d-a404-fb910d793f39]
+codeuri = "/Users/ccs/projects/FBP/src/CalcPartialResults/src"
+runtime = "python3.12"
+architecture = "arm64"
+handler = "CalcPartialResults.lambda_handler"
+manifest_hash = ""
+packagetype = "Zip"
+functions = ["CalcPartialResults"]
+
+[function_build_definitions.2f93c219-42b8-44b4-8800-d16dfa97e8ab]
+codeuri = "/Users/ccs/projects/FBP/src/GetPartialResults/src"
+runtime = "python3.12"
+architecture = "arm64"
+handler = "GetPartialResults.lambda_handler"
+manifest_hash = ""
+packagetype = "Zip"
+functions = ["GetPartialResults"]
+
 [layer_build_definitions.04d3ab22-5614-4c99-b7da-138e4fd71ef4]
 layer_name = "FBPLibLayer"
 codeuri = "/Users/ccs/projects/FBP/src/FBPLib-Layer"

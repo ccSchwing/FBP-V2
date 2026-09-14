@@ -19,7 +19,7 @@
       ]
     },
     {
-      "name": "Python: Local Invoke and Debug CalcWeeklyResults",
+      "name": "Python: Invoke and Debug CalcWeeklyResults",
       "type": "debugpy",
       "request": "attach",
       "connect": {
@@ -31,6 +31,40 @@
       "pathMappings": [
         {
           "localRoot": "${workspaceFolder}/src/CalcWeeklyResults/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },
+    {
+      "name": "Python: Attach to CalcPartialResults",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Debug CalcPartialResults",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/CalcPartialResults/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },
+    {
+      "name": "Python: Attach to UpdatePartialWeeklyResults",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Debug UpdatePartialWeeklyResults",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/UpdatePartialWeeklyResults/src",
           "remoteRoot": "/var/task"
         }
       ]
@@ -575,6 +609,23 @@
       "pathMappings": [
         {
           "localRoot": "${workspaceFolder}/src/GetPickSheet/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },
+    {
+      "name": "Python: Attach to GetPartialResults",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Attach to GetPartialResults",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/GetPartialResults/src",
           "remoteRoot": "/var/task"
         }
       ]

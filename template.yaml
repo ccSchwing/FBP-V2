@@ -1523,7 +1523,7 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
-            TableName: !Sub 
+            TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-Schedule"
       Environment:
@@ -1563,6 +1563,53 @@ Resources:
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /updateTotalCorrectAndIncorrectPicks
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+
+  
+  UpdatePartialWeeklyResults:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-update-partial-weekly-results
+      CodeUri: src/UpdatePartialWeeklyResults/src/
+      Handler: UpdatePartialWeeklyResults.lambda_handler
+      Runtime: python3.12
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBP-Config"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBP-Users"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-Log"
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-Schedule"
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-FBP-Picks"
+      Environment:
+        Variables:
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
+      Layers:
+        - !Ref FBPLibLayer
+      Events:
+        UpdatePartialWeeklyResultsGET:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /updatePartialWeeklyResults
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        UpdatePartialWeeklyResultsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /updatePartialWeeklyResults
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
 
@@ -1606,6 +1653,49 @@ Resources:
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /calcWeeklyResults
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+
+  CalcPartialResults:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-calc-partial-results
+      CodeUri: src/CalcPartialResults/src/
+      Handler: CalcPartialResults.lambda_handler
+      Runtime: python3.12
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBP-Users"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-Log"
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-FBP-Picks"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBP-Config"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-Schedule"
+      Environment:
+        Variables:
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
+      Layers:
+        - !Ref FBPLibLayer
+      Events:
+        CalcPartialResultsGET:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /calcPartialResults
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        CalcPartialResultsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /calcPartialResults
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
 
@@ -1653,6 +1743,50 @@ Resources:
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
 
+  GetPartialResults:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/GetPartialResults/src/
+      Handler: GetPartialResults.lambda_handler
+      Runtime: python3.12
+      FunctionName: !Sub ${AWS::StackName}-get-partial-results
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBP-Users"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBP-Weekly-Results"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-Log"
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-FBP-Picks"
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-FBP-Config"
+      Environment:
+        Variables:
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPLogsTableName: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+      Layers:
+        - !Ref FBPLibLayer
+      Events:
+        GetPartialResultsGET:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /getPartialResults
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        GetPartialResultsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /getPartialResults
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+
+  
   SaveFBPPicks:
     Type: AWS::Serverless::Function
     Properties:
@@ -2070,6 +2204,16 @@ Outputs:
     Value: !Ref FBPHttpApi
     Export:
       Name: !Sub ${AWS::StackName}-HttpApiId
+  GetPartialResultsFunctionName:
+    Description: Name of the GetPartialResults Lambda function
+    Value: !Ref GetPartialResults
+    Export:
+      Name: !Sub ${AWS::StackName}-GetPartialResults
+  GetPartialResultsEndpoint:
+    Description: Endpoint for the GetPartialResults API
+    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getPartialResults
+    Export:
+      Name: !Sub ${AWS::StackName}-GetPartialResultsEndpoint
   HtmlToPdfFunctionName:
     Description: Name of the HtmlToPdf Lambda function
     Value: !Ref HTMLtoPDF
