@@ -63,7 +63,7 @@
       if (poolOpen === null) {
         setGridStatus("Unable to determine pool status. Contact support at fbpadmin@my-fbp.com.", "error");
       } else {
-        setGridStatus("Fetching weekly results...", "success");
+        setGridStatus("Fetching partial weekly results...", "success");
         const response = await showWeeklyResults();
       }
     });
@@ -107,7 +107,7 @@
         // If week is 1, there are no results to show.
         // only after week 1 when picks have been made and the pool is closed, will we have results to show.
 
-        const URL_KEY = "getWeeklyResults";
+        const URL_KEY = "getPartialResults";
         const lambdaURL = await getServiceUrl(URL_KEY);
         const response = await fetch(lambdaURL, {
           method: "GET",

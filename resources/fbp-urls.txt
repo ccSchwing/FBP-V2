@@ -16,7 +16,7 @@ getPickSheet:https://my-fbp.com/prod/getPickSheet
 getFBPPicksForUserPython:https://my-fbp.com/prod/getFBPPicksPython
 savePicks:https://my-fbp.com/prod/saveFBPPicks
 getWeeklyResults:https://my-fbp.com/prod/getWeeklyResults
-getPartialWeeklyResults:https://my-fbp.com/prod/getPartialWeeklyResults
+getPartialResults:https://my-fbp.com/prod/getPartialResults
 calcWeeklyResults:https://my-fbp.com/prod/calcWeeklyResults
 updateWeeklyResults:https://my-fbp.com/prod/updateWeeklyResults
 getFBPUserEmailAndDisplayName:https://my-fbp.com/prod/getFBPUserEmailAndDisplayName

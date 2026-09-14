@@ -614,6 +614,23 @@
       ]
     },
     {
+      "name": "Python: Attach to GetPartialResults",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Attach to GetPartialResults",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/GetPartialResults/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },
+    {
       "name": "Python: Attach to GetSchedule",
       "type": "debugpy",
       "request": "attach",

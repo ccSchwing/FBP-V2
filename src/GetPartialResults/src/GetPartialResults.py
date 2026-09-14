@@ -35,12 +35,12 @@ cors_config = CORSConfig(
 
 app=APIGatewayHttpResolver(cors=cors_config)
 
-@app.get("/getPartialWeeklyResults")
-def getPartialWeeklyResults():
-    FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResultsTableName', 'FBP-Weekly-Results-2026')
+@app.get("/getPartialResults")
+def getPartialResults():
+    FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResultsTableName', '2026-FBP-Weekly-Results')
     logger.info(f"Using DynamoDB table: {FBP_WEEKLY_RESULTS_TABLE}")  # Log the table name being used
-    fbpLog("fbpadmin@my-fbp.com", "GetPartialWeeklyResults", "Lambda function initialized", "INFO")
-    fbpLog("fbpadmin@my-fbp.com", "GetPartialWeeklyResults", "Retrieving weekly results", "INFO")
+    fbpLog("fbpadmin@my-fbp.com", "GetPartialResults", "Lambda function initialized", "INFO")
+    fbpLog("fbpadmin@my-fbp.com", "GetPartialResults", "Retrieving weekly results", "INFO")
    
     FBP_USERS_TABLE_NAME = os.environ.get('FBPUsersTableName', 'FBP-Users')
     logger.info(f"Using FBP Users DynamoDB table: {FBP_USERS_TABLE_NAME}")
@@ -55,13 +55,13 @@ def getPartialWeeklyResults():
 
     week=getCurrentWeek.getCurrentWeek()
     if week is None:
-        fbpLog("fbpadmin@my-fbp.com", "GetPartialWeeklyResults", "Could not determine current week", "ERROR")
+        fbpLog("fbpadmin@my-fbp.com", "GetPartialResults", "Could not determine current week", "ERROR")
         return {
             'statusCode': 500,
             'body': json.dumps({'message': 'Could not determine current week'}),
         }
     logger.info(f"Retrieving results for week: {week}")
-    fbpLog("fbpadmin@my-fbp.com", "GetPartialWeeklyResults", f"Retrieving partialresults for week: {week}", "INFO")
+    fbpLog("fbpadmin@my-fbp.com", "GetPartialResults", f"Retrieving partialresults for week: {week}", "INFO")
     try:
         # Filter the scan for the current week's results.
         response = resultsTable.scan(
@@ -71,7 +71,7 @@ def getPartialWeeklyResults():
         allUserPicks  = response.get('Items', [])
         if not allUserPicks:
             logger.warning(f"No picks found for week {week}")
-            fbpLog("fbpadmin@my-fbp.com", "GetPartialWeeklyResults", f"No picks found for week {week}", "WARNING")
+            fbpLog("fbpadmin@my-fbp.com", "GetPartialResults", f"No picks found for week {week}", "WARNING")
             return {
                 'statusCode': 404,
                 'body': json.dumps({'message': f'No picks found for week {week}'}),
@@ -96,14 +96,14 @@ def getPartialWeeklyResults():
         }
     except ClientError as e:
         logger.error(f"DynamoDB Error: {e}")
-        fbpLog("fbpadmin@my-fbp.com", "GetPartialWeeklyResults", f"DynamoDB Error: {e}", "ERROR")
+        fbpLog("fbpadmin@my-fbp.com", "GetPartialResults", f"DynamoDB Error: {e}", "ERROR")
         return {
             'statusCode': 500,
             'body': json.dumps({'error': 'DynamoDB Error'}),
         }
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        fbpLog("fbpadmin@my-fbp.com", "GetPartialWeeklyResults", f"Unexpected error: {e}", "ERROR")
+        fbpLog("fbpadmin@my-fbp.com", "GetPartialResults", f"Unexpected error: {e}", "ERROR")
         return {
             'statusCode': 500,
             'body': json.dumps({'error': 'Unexpected error'}),
