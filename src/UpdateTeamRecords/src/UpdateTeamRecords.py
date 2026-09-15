@@ -33,7 +33,7 @@ def _as_bool(value: str) -> bool:
 
 
 @tracer.capture_method
-@app.get(r"/updateTeamRecords")
+@app.get("/updateTeamRecords")
 def updateTeamRecords() -> Response:
     logger.info("Fetching team records")
     try:

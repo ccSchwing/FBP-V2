@@ -510,7 +510,7 @@ Resources:
         Variables:
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
           FBPLogsTableName: !Sub "${Year}-Log"
-          DynamoDBFBPRecordTable: !Sub "${Year}-Record"
+          FBPTeamRecordsTableName: !Sub "${Year}-Record"
           FBPScheduleTableName: !Sub "${Year}-Schedule"
       Policies:
         - DynamoDBReadPolicy:
@@ -549,7 +549,7 @@ Resources:
         Variables:
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
           FBPLogsTableName: !Sub "${Year}-Log"
-          DynamoDBFBPRecordTable: !Sub "${Year}-Record"
+          FBPTeamRecordsTableName: !Sub "${Year}-Record"
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-FBP-Config"
