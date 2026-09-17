@@ -1,3 +1,8 @@
+// Import marked.min.js for Markdown parsing
+import { marked, parse } from '/js-lib/marked.esm.js';
+// Don't know if I need DOMPurify since the only HTML is mine.
+// import DOMPurify from '/js-lib/purify.min.js';
+
 import { getServiceUrl } from "/js-lib/urlConfig.js";
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -24,7 +29,8 @@ export async function sendChatBotMessage() {
             body: JSON.stringify({ question, sessionId: getSessionId() })
         });
         const data = await response.json();
-        thinking.textContent = response.ok ? data.answer : 'Sorry, I encountered an error. Please try again.';
+        thinking.innerHTML = response.ok ? marked(data.answer) : 'Sorry, I encountered an error. Please try again.';
+        // data.answer contains the chatbot's response.
         thinking.classList.remove('thinking');
     } catch (error) {
         console.error('Error:', error);
@@ -37,7 +43,7 @@ function addMessage(classes, message) {
     const messagesDiv = document.getElementById('chat-messages');
     const div = document.createElement('div');
     div.className = 'msg ' + classes;
-    div.textContent = message;
+    div.innerHTML = marked(message);
     messagesDiv.appendChild(div);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
     return div;
