@@ -28,6 +28,11 @@ logger.info(
 
 USERS_TABLE_NAME = os.environ.get("FBPUsersTableName", "FBP-Users")
 logger.info(f"Using DynamoDB table: {USERS_TABLE_NAME}")
+FBP_PICKS_TABLE_NAME = os.environ.get("FBPPicksTableName", "FBP-Picks")
+FBP_SCHEDULE_TABLE_NAME = os.environ.get("FBPScheduleTableName", "FBP-Schedule")
+S3_BUCKET_NAME = os.environ.get("S3BucketName", "my-fbp.com")
+CLOUDFRONT_DOMAIN = os.environ.get("CloudFrontDomain")
+HTML_TO_PDF_FUNCTION = os.environ.get("HTMLtoPDF", "HTMLtoPDF")
 # fbpLog("fbpadmin@my-fbp.com", "ClosePool", "Lambda function initialized", "INFO")
 
 cors_config = CORSConfig(
@@ -48,6 +53,14 @@ app = APIGatewayHttpResolver(proxy_type=ProxyEventType.APIGatewayProxyEventV2, c
 ##
 # Close to Pool
 ##
+@app.post("/generateGridsheetPdf")
+def generateGridsheetPdf():
+    body = app.current_event.json_body or {}
+    week = body.get("week") or getCurrentWeek()
+    result = generate_gridsheet_pdf(week)
+    return {"statusCode": 200, "body": json.dumps({"result": result})}
+
+
 @tracer.capture_method
 @app.get("/closePool")
 def closePool():
@@ -314,7 +327,6 @@ def closePool():
             if result.get("statusCode") == 200:
                 logging.info(f"SetPoolStatusClosed Body: {body}")
                 logging.info("SetPoolStatusClosed succeeded, proceeding to next steps.")
-                # Here you would add the logic to invoke the next Lambda functions for emailing users, updating pool status, etc.
         else:
             logging.error(
                 f"SetPoolStatusClosed failed with status code: {result.get('statusCode')}"
@@ -353,6 +365,119 @@ def closePool():
                 }
             ),
         }
+
+    try:
+        pdf_result = generate_gridsheet_pdf(current_week)
+        logging.info(f"Gridsheet PDF generated: {pdf_result}")
+    except Exception as e:
+        logging.exception(f"Error generating gridsheet PDF: {e}")
+        # Non-fatal — pool is already closed, just log it
+
+    return {"statusCode": 200, "body": json.dumps({"status": "success", "message": f"Pool closed for week {current_week}"})}
+
+
+def generate_gridsheet_pdf(week):
+    dynamodb = boto3.resource("dynamodb")
+
+    schedule = dynamodb.Table(FBP_SCHEDULE_TABLE_NAME).query(
+        KeyConditionExpression=boto3.dynamodb.conditions.Key("Week").eq(week)
+    ).get("Items", [])
+
+    picks_response = dynamodb.Table(FBP_PICKS_TABLE_NAME).scan(
+        FilterExpression=boto3.dynamodb.conditions.Attr("week").eq(week)
+    )
+    all_picks = picks_response.get("Items", [])
+    while "LastEvaluatedKey" in picks_response:
+        picks_response = dynamodb.Table(FBP_PICKS_TABLE_NAME).scan(
+            FilterExpression=boto3.dynamodb.conditions.Attr("week").eq(week),
+            ExclusiveStartKey=picks_response["LastEvaluatedKey"]
+        )
+        all_picks.extend(picks_response.get("Items", []))
+
+    users_table = dynamodb.Table(USERS_TABLE_NAME)
+    user_picks = []
+    for item in all_picks:
+        email = item.get("email")
+        if email:
+            user = users_table.get_item(Key={"email": email}).get("Item", {})
+            if user.get("userType") == "user":
+                user_picks.append(item)
+    user_picks.sort(key=lambda x: (x.get("displayName") or "").lower())
+
+    domain = f"https://{CLOUDFRONT_DOMAIN}" if CLOUDFRONT_DOMAIN else "https://my-fbp.com"
+
+    rows_html = ""
+    for user_pick in user_picks:
+        picks_str = str(user_pick.get("picks", ""))
+        team_names = []
+        for i, code in enumerate(picks_str):
+            game = schedule[i] if i < len(schedule) else None
+            if game and code == "H":
+                team_names.append(game["Home"])
+            elif game and code == "A":
+                team_names.append(game["Away"])
+            else:
+                team_names.append(code)
+
+        picks_cells = "".join(
+            f'<img src="{domain}/images/{t}.gif" alt="{t}" style="width:30px;height:30px;" />'
+            for t in team_names
+        )
+        rows_html += (
+            f"<tr>"
+            f"<td>{user_pick.get('displayName', '')}</td>"
+            f"<td>{picks_cells}</td>"
+            f"<td>{user_pick.get('tieBreaker', '')}</td>"
+            f"</tr>"
+        )
+
+    html = f"""<!doctype html><html><head><meta charset="UTF-8">
+<style>
+  body {{ font-family: sans-serif; }}
+  table {{ border-collapse: collapse; margin: auto; }}
+  th, td {{ border: 1px solid #ccc; padding: 4px 8px; }}
+  img {{ width: 30px; height: 30px; }}
+</style></head>
+<body>
+<h2 style="text-align:center">FBP Week {week} Gridsheet</h2>
+<table><thead><tr><th>Name</th><th>Picks</th><th>TB</th></tr></thead>
+<tbody>{rows_html}</tbody></table>
+</body></html>"""
+    year=os.environ.get("YEAR", "2026")
+    filename = f"gridsheet_week_{week}_{year}.pdf"
+    payload = json.dumps({"html": html, "filename": filename, "base_url": domain})
+    powertools_event = {
+        "version": "2.0",
+        "routeKey": "POST /htmlToPdf",
+        "rawPath": "/htmlToPdf",
+        "rawQueryString": "",
+        "headers": {"content-type": "application/json"},
+        "body": payload,
+        "requestContext": {
+            "routeKey": "POST /htmlToPdf",
+            "stage": "$default",
+            "requestId": "local-request-id",
+            "apiId": "local",
+            "http": {
+                "method": "POST",
+                "path": "/htmlToPdf",
+                "protocol": "HTTP/1.1",
+                "sourceIp": "127.0.0.1",
+                "userAgent": "sam-local",
+            },
+        },
+        "isBase64Encoded": False,
+    }
+    response = boto3.client("lambda").invoke(
+        FunctionName=HTML_TO_PDF_FUNCTION,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(powertools_event),
+    )
+    result = json.loads(response["Payload"].read())
+    logging.info(f"HTMLtoPDF result: {result}")
+    return result
+
+
 @tracer.capture_lambda_handler
 def lambda_handler(event, context) -> dict[str, Any]:
     logging.info(f"Received event: {event}")

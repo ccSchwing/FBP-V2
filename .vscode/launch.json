@@ -53,6 +53,23 @@
       ]
     },
     {
+      "name": "Python: Attach to GenerateGridsheetPdf",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Debug GenerateGridsheetPdf",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/ClosePool/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },
+    {
       "name": "Python: Attach to UpdatePartialWeeklyResults",
       "type": "debugpy",
       "request": "attach",

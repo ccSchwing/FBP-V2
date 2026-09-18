@@ -718,6 +718,10 @@ Resources:
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
           FBPLogsTableName: !Sub "${Year}-Log"
           FBPScheduleTableName: !Sub "${Year}-Schedule"
+          FBPPicksTableName: !Sub "${Year}-FBP-Picks"
+          FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          S3BucketName: !Ref S3BucketName
+          CloudFrontDomain: !Ref CloudFrontDomain
           SetPoolStatusClosed: !Ref SetPoolStatusClosed # Close pool for the week. This is the last thing done.
           SaveFBPPicks: !Ref SaveFBPPicks # Validate user picks
           ##
@@ -725,6 +729,7 @@ Resources:
           # SendEmail: !Ref SendEmail # Send email for PickSheet and GridSheet.
           ImportSpreadsAndFinalScores: !Ref ImportSpreadsAndFinalScores # Import spreads and final scores for the week.
           AdvancedMessagingService: !Ref AdvancedMessagingService # Send messages to users about new week and weekly results.
+          HTMLtoPDF: !Ref HTMLtoPDF # Generate gridsheet PDF.
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -737,10 +742,17 @@ Resources:
                 - !GetAtt SetPoolStatusClosed.Arn # Close pool for new week.
                 - !GetAtt ImportSpreadsAndFinalScores.Arn # Import spreads and final scores for the week.
                 - !GetAtt AdvancedMessagingService.Arn # Send messages to users about new week and weekly results.
+                - !GetAtt HTMLtoPDF.Arn # Generate gridsheet PDF.
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-Log"
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-Schedule"
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-FBP-Picks"
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-FBP-Users"
       Events:
         ClosePoolGET:
           Type: HttpApi

@@ -28,71 +28,37 @@ def chatbot(event, context):
         if not user_question:
             return create_response(400, {'error': 'Question is required'})
         
-        # Your Knowledge Base ID (replace with your actual KB ID)
         knowledge_base_id = os.environ.get('KnowledgeBaseId', 'YOUR_FBP_KB_ID_HERE')
         
-        # Model ARN for Nova Lite (adjust region as needed)
-        region = os.environ.get('AWS_REGION', 'us-east-1')
-
-        model_arn = f"arn:aws:bedrock:{region}::foundation-model/amazon.nova-lite-v1:0"
         response = agentic_retrieve(user_question, knowledge_base_id)
         
-        # Extract the answer and sources from the streaming response
         answer = ""
         sources = []
-        
-        # Process the streaming response
         if 'stream' in response:
-            for event in response['stream']:
-            # Check for nested responseEvent structure first
-                if 'responseEvent' in event and 'text' in event['responseEvent']:
-                    answer += event['responseEvent']['text']
-            
-        # Original logic as fallback
-        elif 'text' in event:
-            text_data = event['text']
-            if isinstance(text_data, dict):
-                # If it's a dict, extract text content
-                if 'text' in text_data:
-                    answer += text_data['text']
-                elif 'delta' in text_data and 'text' in text_data['delta']:
-                    answer += text_data['delta']['text']
-            else:
-                # If it's a string, use directly
-                answer += str(text_data)
-            for event in response['stream']:
-                if 'text' in event:
-                    text_data = event['text']
-                    if isinstance(text_data, dict):
-                        # If it's a dict, extract text content
-                        if 'text' in text_data:
-                            answer += text_data['text']
-                        elif 'delta' in text_data and 'text' in text_data['delta']:
-                            answer += text_data['delta']['text']
-                    else:
-                        # If it's a string, use directly
-                        answer += str(text_data)                
-                if 'chunk' in event:
-                    chunk = event['chunk']
-                    if 'bytes' in chunk:
-                        chunk_data = json.loads(chunk['bytes'].decode('utf-8'))
-                        
-                        # Extract answer text
-                        if 'type' in chunk_data and chunk_data['type'] == 'response':
-                            if 'delta' in chunk_data and 'text' in chunk_data['delta']:
-                                answer += chunk_data['delta']['text']
-                        
-                        # Extract sources from result event
-                        if 'type' in chunk_data and chunk_data['type'] == 'result':
-                            if 'retrievalResults' in chunk_data:
-                                for result in chunk_data['retrievalResults']:
-                                    if 'location' in result and 's3Location' in result['location']:
-                                        sources.append({
-                                            'uri': result['location']['s3Location']['uri'],
-                                            'content': result.get('content', {}).get('text', '')[:200] + '...'
-                                        })
- 
-        # Return successful response
+            for stream_event in response['stream']:
+                
+                # --- ANSWER TEXT ---
+                if 'responseEvent' in stream_event:
+                    answer += stream_event['responseEvent'].get('text', '')
+                
+                # --- SOURCES --- one traceEvent, no deduplication needed
+                if 'traceEvent' in stream_event:
+                    seen_uris = set()
+                    for item in (stream_event
+                            .get('traceEvent', {})
+                            .get('attributes', {})
+                            .get('retrievalResponse', [])):
+                        # uri = item.get('metadata', {}).get('function variables', {}).get('_source_uri', '')
+                        uri = item.get('metadata', {}).get('_source_uri', '')
+                        if uri and uri not in seen_uris:
+                            sources.append({'uri': uri})
+                            seen_uris.add(uri)
+
+            # Process the streaming response from agentic_retrieve_stream
+                # Log any trace events for debugging (optional, remove in production)
+                if 'traceEvent' in stream_event:
+                    logger.info(f"Trace: {json.dumps(stream_event['traceEvent'])}")
+
         return create_response(200, {
             'answer': answer.strip(),
             'sources': sources
@@ -137,7 +103,6 @@ def agentic_retrieve(question, kb_id):
         
         logger.info(f"Successfully initiated agentic retrieve for question: {question[:50]}...")
         return response
-        
 
     except ClientError as e:
         logger.error(f"Bedrock API error: {e}")
@@ -155,14 +120,12 @@ def create_response(status_code, body):
         'statusCode': status_code,
         'headers': {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',  # Adjust for your domain
+            'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': 'Content-Type',
             'Access-Control-Allow-Methods': 'POST, OPTIONS'
         },
         'body': json.dumps(body)
     }
-
-# Initialize Bedrock client
 
 def lambda_handler(event, context):
     return chatbot(event, context)

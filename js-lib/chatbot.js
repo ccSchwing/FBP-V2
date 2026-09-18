@@ -29,7 +29,17 @@ export async function sendChatBotMessage() {
             body: JSON.stringify({ question, sessionId: getSessionId() })
         });
         const data = await response.json();
-        thinking.innerHTML = response.ok ? marked(data.answer) : 'Sorry, I encountered an error. Please try again.';
+        if (response.ok) {
+            let html = marked(data.answer);
+            if (data.sources?.length) {
+                html += '<div class="chat-sources"><strong>Sources:</strong><ul>'
+                    + data.sources.map(s => `<li><a href="${s.uri}" target="_blank">${s.uri}</a></li>`).join('')
+                    + '</ul></div>';
+            }
+            thinking.innerHTML = html;
+        } else {
+            thinking.innerHTML = 'Sorry, I encountered an error. Please try again.';
+        }
         // data.answer contains the chatbot's response.
         thinking.classList.remove('thinking');
     } catch (error) {

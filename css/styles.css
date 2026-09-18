@@ -4,6 +4,14 @@
   }
 }
 
+.chat-sources {
+    margin-top: 0.5rem;
+    font-size: 0.85em;
+    border-top: 1px solid #ddd;
+    padding-top: 0.5rem;
+}
+
+
 /* Show Weekly Results page responsive and table styles (continued) */
 @media (max-width: 900px) {
   .results-layout {
