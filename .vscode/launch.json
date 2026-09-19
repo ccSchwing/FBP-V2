@@ -70,6 +70,23 @@
       ]
     },
     {
+      "name": "Python: Attach to GeneratePicksheetPdf",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Debug GeneratePicksheetPdf",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/OpenPool/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },
+    {
       "name": "Python: Attach to UpdatePartialWeeklyResults",
       "type": "debugpy",
       "request": "attach",

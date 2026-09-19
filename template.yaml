@@ -667,7 +667,7 @@ Resources:
     Properties:
       FunctionName: !Sub ${AWS::StackName}-open-pool
       CodeUri: src/OpenPool/src/
-      Handler: OpenPool.openPool
+      Handler: OpenPool.lambda_handler
       Runtime: python3.12
       Timeout: 240
       MemorySize: 512
@@ -675,8 +675,12 @@ Resources:
         - !Ref FBPLibLayer
       Environment:
         Variables:
+          Year: !Ref Year
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
           FBPLogsTableName: !Sub "${Year}-Log"
+          FBPScheduleTableName: !Sub "${Year}-Schedule"
+          S3BucketName: !Ref S3BucketName
+          CloudFrontDomain: !Ref CloudFrontDomain
           SetPoolStatusOpen: !Ref SetPoolStatusOpen # Open pool for new week.
           CalcWeeklyResults: !Ref CalcWeeklyResults # Calc NFL Game Results for the week just ended.
           UpdateWeeklyResults: !Ref UpdateWeeklyResults # Update User results.
@@ -684,6 +688,7 @@ Resources:
           AdvancedMessagingService: !Ref AdvancedMessagingService # Send messages to users about new week and weekly results.
           SendEmail: !Ref SendEmail
           FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+          HTMLtoPDF: !Ref HTMLtoPDF # Generate picksheet PDF.
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -697,12 +702,15 @@ Resources:
                 - !GetAtt AdvancedMessagingService.Arn
                 - !GetAtt SendEmail.Arn
                 - !GetAtt SetPoolStatusOpen.Arn
+                - !GetAtt HTMLtoPDF.Arn
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-FBP-Weekly-Results"
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-Schedule"
 
   ClosePool:
     Type: AWS::Serverless::Function

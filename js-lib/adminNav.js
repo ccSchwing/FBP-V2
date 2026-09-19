@@ -6,8 +6,6 @@ const adminLinks = `
   <li><a href="/fbp-admin/signup.html">Create FBP Account</a></li>
   <li><a href="/fbp-admin/manageuserprofiles.html">Manage User Profiles</a></li>
   <li><a href="/fbp-admin/dashboard.html">Admin Dashboard</a></li>
-  <li><a href="/fbp-admin/getpicksheet.html">Create Picksheet PDF</a></li>
-  <li><a href="/fbp-admin/getgridsheet.html">Create Gridsheet PDF</a></li>
 `;
 
 export async function initAdminNav() {

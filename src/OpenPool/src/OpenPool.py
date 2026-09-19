@@ -14,6 +14,10 @@ logger.info("OpenPool Lambda function initialized successfully")
 
 lambda_client = boto3.client("lambda")
 
+FBP_SCHEDULE_TABLE_NAME = os.environ.get("FBPScheduleTableName", "FBP-Schedule")
+CLOUDFRONT_DOMAIN = os.environ.get("CloudFrontDomain")
+HTML_TO_PDF_FUNCTION = os.environ.get("HTMLtoPDF", "HTMLtoPDF")
+
 # This lamdda function is responsible for all of the work needed to figure out who
 # won for the week.
 # Step 0:  Make sure the pool is closed for the week that just ended.
@@ -24,6 +28,81 @@ lambda_client = boto3.client("lambda")
 # Open the pool for the next week.
 # Send out the weekly results email to all users.
 # That should do it.  : -)
+def generate_picksheet_pdf(week):
+    schedule = boto3.resource("dynamodb").Table(FBP_SCHEDULE_TABLE_NAME).query(
+        KeyConditionExpression=boto3.dynamodb.conditions.Key("Week").eq(week)
+    ).get("Items", [])
+
+    domain = f"https://{CLOUDFRONT_DOMAIN}" if CLOUDFRONT_DOMAIN else "https://my-fbp.com"
+
+    rows_html = ""
+    for i, game in enumerate(schedule):
+        away, home = game.get("Away", ""), game.get("Home", "")
+        spread = game.get("Spread", "")
+        underdog = game.get("Underdog", "")
+        away_spread = f"+{spread}" if underdog == "A" else f"-{spread}" if spread else ""
+        home_spread = f"+{spread}" if underdog == "H" else f"-{spread}" if spread else ""
+        row_class = "game-even" if i % 2 == 0 else "game-odd"
+        rows_html += (
+            f'<tr class="{row_class}">'
+            f'<td><input type="checkbox" name="game{i}" value="A"></td>'
+            f'<td><img src="{domain}/images/{away}.gif" style="width:20px;height:20px;"> {away} {away_spread}</td>'
+            f'<td><img src="{domain}/images/{home}.gif" style="width:20px;height:20px;"> {home} {home_spread}</td>'
+            f'<td><input type="checkbox" name="game{i}" value="H"></td>'
+            f"</tr>"
+        )
+
+    html = f"""<!doctype html><html><head><meta charset="UTF-8">
+<style>
+  body {{ font-family: Arial, sans-serif; font-size: 9px; color: #000; background: #fff; margin: 0.5cm; }}
+  table {{ border-collapse: collapse; width: auto; }}
+  th {{ background-color: #4caf50; color: #fff; padding: 3px 8px; text-align: center; }}
+  td {{ padding: 2px 6px; text-align: center; vertical-align: middle; border-bottom: 1px solid #e0e0e0; }}
+  tr.game-even td {{ background-color: #f9f9f9; }}
+  tr.game-odd td {{ background-color: #fff; }}
+  img {{ width: 20px; height: 20px; }}
+</style></head>
+<body>
+<h2 style="text-align:center">FBP Week {week} Pick Sheet</h2>
+<table><thead><tr><th>Pick</th><th>Away</th><th>Home</th><th>Pick</th></tr></thead>
+<tbody>{rows_html}</tbody></table>
+</body></html>"""
+
+    year = os.environ.get("Year")
+    filename = f"picksheet_week_{week}_{year}.pdf"
+    payload = json.dumps({"html": html, "filename": filename, "base_url": domain})
+    powertools_event = {
+        "version": "2.0",
+        "routeKey": "POST /htmlToPdf",
+        "rawPath": "/htmlToPdf",
+        "rawQueryString": "",
+        "headers": {"content-type": "application/json"},
+        "body": payload,
+        "requestContext": {
+            "routeKey": "POST /htmlToPdf",
+            "stage": "$default",
+            "requestId": "local-request-id",
+            "apiId": "local",
+            "http": {
+                "method": "POST",
+                "path": "/htmlToPdf",
+                "protocol": "HTTP/1.1",
+                "sourceIp": "127.0.0.1",
+                "userAgent": "sam-local",
+            },
+        },
+        "isBase64Encoded": False,
+    }
+    response = boto3.client("lambda").invoke(
+        FunctionName=HTML_TO_PDF_FUNCTION,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(powertools_event),
+    )
+    result = json.loads(response["Payload"].read())
+    logging.info(f"HTMLtoPDF result: {result}")
+    return result
+
+
 def openPool(event, context):
     open_pool_status_check(event, context)
     invoke_import_spreads_and_final_scores(event, context)
@@ -32,6 +111,12 @@ def openPool(event, context):
     invoke_advanced_messaging_service()
     import_spreads_and_final_scores_for_new_week()
     set_pool_open()
+    try:
+        week = getCurrentWeek()
+        pdf_result = generate_picksheet_pdf(week)
+        logging.info(f"Picksheet PDF generated: {pdf_result}")
+    except Exception as e:
+        logging.exception(f"Error generating picksheet PDF: {e}")  # Non-fatal
 
 def open_pool_status_check(event, context):
     # Make user that the pool is closed.
@@ -641,13 +726,25 @@ def import_spreads_and_final_scores_for_new_week():
             ),
         }
 
-    return {
-        "statusCode": 200,
-        "body": json.dumps(
-            {
-                "status": "success",
-                "message": "Pool opened successfully",
-                "details": {"poolOpen": True, "week": getCurrentWeek()},
-            }
-        ),
-    }
+from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
+from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
+
+cors_config = CORSConfig(
+    allow_origin="*",
+    allow_headers=["Content-Type", "X-Amz-Date", "Authorization", "X-Api-Key", "X-Amz-Security-Token"],
+    max_age=86400,
+    allow_credentials=False,
+)
+app = APIGatewayHttpResolver(cors=cors_config)
+
+
+@app.post("/generatePicksheetPdf")
+def generatePicksheetPdf():
+    body = app.current_event.json_body or {}
+    week = body.get("week") or getCurrentWeek()
+    result = generate_picksheet_pdf(week)
+    return {"statusCode": 200, "body": json.dumps({"result": result})}
+
+
+def lambda_handler(event, context):
+    return app.resolve(event, context)
