@@ -336,10 +336,6 @@ def updateWeeklyUserResults(allUserPicks: List[Dict[str, Any]], resultsTable, us
             fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", f"DynamoDB Error: {e}", "ERROR")
             return Response(status_code=500, content_type="application/json", body=json.dumps({'error': f'DynamoDB error saving results for {email}'})) 
 
-        except ClientError as e:
-            logger.exception(f"DynamoDB Error: {e}")
-            fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", f"DynamoDB Error: {e}", "ERROR")
-            return Response(status_code=500, content_type="application/json", body=json.dumps({'error': f'DynamoDB error updating user totals for {email}'}))
         logger.info(f"Updated weekly results for user: {email} with correct picks: {correctpicks} and incorrect picks: {incorrectpicks}")
         fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", f"Updated weekly results for user: {email} with correct picks: {correctpicks} and incorrect picks: {incorrectpicks}", "INFO")
         '''

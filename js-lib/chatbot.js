@@ -6,9 +6,25 @@ import { marked, parse } from '/js-lib/marked.esm.js';
 import { getServiceUrl } from "/js-lib/urlConfig.js";
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('chat-input')?.addEventListener('keydown', e => {
+    if (!document.getElementById('chat-widget')) {
+        document.body.insertAdjacentHTML('beforeend', `
+            <div id="chat-widget">
+                <button id="chat-toggle" onclick="document.getElementById('chat-widget').classList.toggle('open')" aria-label="Toggle chat">
+                    💬 FBP Assistant
+                </button>
+                <div id="chat-body">
+                    <div id="chat-messages"></div>
+                    <div id="chat-input-row">
+                        <input type="text" id="chat-input" placeholder="Ask me about FBP..." autocomplete="off">
+                        <button id="chat-send" onclick="window.sendChatBotMessage()">Send</button>
+                    </div>
+                </div>
+            </div>`);
+    }
+    document.getElementById('chat-input').addEventListener('keydown', e => {
         if (e.key === 'Enter') sendChatBotMessage();
     });
+    window.sendChatBotMessage = sendChatBotMessage;
 });
 
 export async function sendChatBotMessage() {
@@ -33,7 +49,7 @@ export async function sendChatBotMessage() {
             let html = marked(data.answer);
             if (data.sources?.length) {
                 html += '<div class="chat-sources"><strong>Sources:</strong><ul>'
-                    + data.sources.map(s => `<li><a href="${s.uri}" target="_blank">${s.uri}</a></li>`).join('')
+                    + data.sources.map(s => `<li>[${s.citation}] ${s.uri}</li>`).join('')
                     + '</ul></div>';
             }
             thinking.innerHTML = html;

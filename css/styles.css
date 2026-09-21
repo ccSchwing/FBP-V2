@@ -1019,8 +1019,12 @@ footer {
 #chat-messages .msg.user {
   align-self: flex-end;
   background: #1f8f3a;
-  color: #fff;
+  color: #fff !important;
   border-bottom-right-radius: 4px;
+}
+
+#chat-messages .msg.user * {
+  color: #fff !important;
 }
 
 #chat-messages .msg.bot {
@@ -1028,6 +1032,13 @@ footer {
   background: #f0f0f0;
   color: #222;
   border-bottom-left-radius: 4px;
+  width: fit-content;
+  max-width: 100%;
+  font-size: 1rem;
+}
+
+#chat-messages .msg.bot * {
+  font-size: 1rem;
 }
 
 #chat-messages .msg.bot.thinking {

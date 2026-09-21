@@ -34,6 +34,8 @@ def chatbot(event, context):
         
         answer = ""
         sources = []
+        citation_map = {}
+        seen_uris = set()
         if 'stream' in response:
             for stream_event in response['stream']:
                 
@@ -41,26 +43,28 @@ def chatbot(event, context):
                 if 'responseEvent' in stream_event:
                     answer += stream_event['responseEvent'].get('text', '')
                 
-                # --- SOURCES --- one traceEvent, no deduplication needed
+                # --- SOURCES --- build citation-number -> filename map
                 if 'traceEvent' in stream_event:
-                    seen_uris = set()
-                    for item in (stream_event
+                    for idx, item in enumerate(stream_event
                             .get('traceEvent', {})
                             .get('attributes', {})
-                            .get('retrievalResponse', [])):
-                        # uri = item.get('metadata', {}).get('function variables', {}).get('_source_uri', '')
+                            .get('retrievalResponse', []), start=1):
                         uri = item.get('metadata', {}).get('_source_uri', '')
                         if uri and uri not in seen_uris:
-                            sources.append({'uri': uri})
+                            citation_map[idx] = uri.split('/')[-1]
                             seen_uris.add(uri)
+            sources = [{'citation': k, 'uri': v} for k, v in citation_map.items()]
 
-            # Process the streaming response from agentic_retrieve_stream
-                # Log any trace events for debugging (optional, remove in production)
-                if 'traceEvent' in stream_event:
-                    logger.info(f"Trace: {json.dumps(stream_event['traceEvent'])}")
+        # Inline citation labels into answer text: [1] -> [1: 2026-Schedule.csv]
+        citation_lookup = {s['citation']: s['uri'] for s in sources}
+        import re
+        def replace_citation(m):
+            n = int(m.group(1))
+            return f"[{n}: {citation_lookup[n]}]" if n in citation_lookup else m.group(0)
+        annotated_answer = re.sub(r'\[(\d+)\]', replace_citation, answer.strip())
 
         return create_response(200, {
-            'answer': answer.strip(),
+            'answer': annotated_answer,
             'sources': sources
         })
         
