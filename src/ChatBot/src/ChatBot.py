@@ -4,6 +4,8 @@ import os
 import logging
 from botocore.exceptions import ClientError
 
+from fbpblockchain.blockchain import Blockchain
+
 # Set up logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -23,6 +25,9 @@ def chatbot(event, context):
             body = event
             
         user_question = body.get('question', '')
+        blockchain = Blockchain()
+        blockchain.add_block(user_question)
+        blockchain.is_valid()
         session_id = body.get('sessionId', '')
         
         if not user_question:

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fbpblockchain"
+version = "0.1.0"
+description = "FBP Blockchain library"
+requires-python = ">=3.7"
+dependencies = [
+    "boto3",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fbpblockchain*"]
