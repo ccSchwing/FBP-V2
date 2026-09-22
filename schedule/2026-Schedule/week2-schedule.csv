@@ -1,17 +1,17 @@
 GameId,Week,Date,Away,Home,AwayScore,HomeScore,Spread,Winner,Underdog
-W2-01,2,2026-09-17,Lions,Bills,0,0,3.5,H or A,A
-W2-02,2,2026-09-20,Panthers,Falcons,0,0,1.5,H or A,A
-W2-03,2,2026-09-20,Bengals,Texans,0,0,2.5,H or A,A
-W2-04,2,2026-09-20,Browns,Buccaneers,0,0,8.5,H or A,A
-W2-05,2,2026-09-20,Packers,Jets,0,0,4.5,H or A,H
-W2-06,2,2026-09-20,Vikings,Bears,0,0,5.5,H or A,A
-W2-07,2,2026-09-20,Saints,Ravens,0,0,8.5,H or A,A
-W2-08,2,2026-09-20,Eagles,Titans,0,0,6.5,H or A,H
-W2-09,2,2026-09-20,Steelers,Patriots,0,0,5.5,H or A,A
-W2-10,2,2026-09-20,Jaguars,Broncos,0,0,2.5,H or A,A
-W2-11,2,2026-09-20,Raiders,Chargers,0,0,7.5,H or A,A
-W2-12,2,2026-09-20,Dolphins,49ers,0,0,12.5,H or A,A
-W2-13,2,2026-09-20,Commanders,Cowboys,0,0,3.5,H or A,A
-W2-14,2,2026-09-20,Seahawks,Cardinals,0,0,4.5,H or A,H
-W2-15,2,2026-09-20,Colts,Chiefs,0,0,6.5,H or A,A
-W2-16,2,2026-09-21,Giants,Rams,0,0,4.5,H or A,A
+W2-01,2,2026-09-17,Lions,Bills,31,41,3.5,H,A
+W2-02,2,2026-09-20,Panthers,Falcons,34,3,1.5,A,A
+W2-03,2,2026-09-20,Bengals,Texans,20,6,2.5,A,A
+W2-04,2,2026-09-20,Browns,Buccaneers,23,19,8.5,A,A
+W2-05,2,2026-09-20,Packers,Jets,20,17,4.5,H,H
+W2-06,2,2026-09-20,Vikings,Bears,9,3,5.5,H,A
+W2-07,2,2026-09-20,Saints,Ravens,24,17,8.5,A,A
+W2-08,2,2026-09-20,Eagles,Titans,24,20,7,H,H
+W2-09,2,2026-09-20,Steelers,Patriots,3,20,5.5,A,A
+W2-10,2,2026-09-20,Jaguars,Broncos,13,20,2.5,H,A
+W2-11,2,2026-09-20,Raiders,Chargers,26,14,7.5,A,A
+W2-12,2,2026-09-20,Dolphins,49ers,13,35,12.5,A,A
+W2-13,2,2026-09-20,Commanders,Cowboys,20,37,4,A,A
+W2-14,2,2026-09-20,Seahawks,Cardinals,31,7,4.5,A,H
+W2-15,2,2026-09-20,Colts,Chiefs,30,33,6.5,H,A
+W2-16,2,2026-09-21,Giants,Rams,28,6,5.5,H,A
