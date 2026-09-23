@@ -970,6 +970,8 @@ Resources:
           SUPPORT_EMAIL: !Ref SupportEmail
           FBPUSERS_TABLE_NAME: !Sub "${Year}-FBP-Users"
           FBPLOGS_TABLE_NAME: !Sub "${Year}-Log"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+          FBPWeeklyResultsWeekIndexName: !Sub "WeekIndex"
           TWILIO_OPT_OUT_TABLE_NAME: !Sub "${Year}-Twilio-Opt-Outs"
           TWILIO_CREDENTIALS_SECRET_ARN: !Ref TwilioCredentialsSecretArn
           POWERTOOLS_SERVICE_NAME: messaging-service

@@ -11,7 +11,6 @@ import boto3
 import logging
 from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Attr, Key
-from aws_lambda_powertools import Tracer
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from fbplib.decimalDefault import decimal_default
@@ -39,7 +38,6 @@ logging.basicConfig(format='%(levelname)s %(message)s')
 logger = logging.getLogger()
 logger.info("Initializing SaveFBPPicksPython Lambda function")  # Log initialization message
 logger.setLevel(logging.INFO)
-tracer = Tracer()
 
 
 cors_config = CORSConfig(
@@ -57,7 +55,6 @@ def isValidPickString(s: str) -> bool:
         return False
     return bool(pattern.match(s))
 
-@tracer.capture_method
 @app.post("/saveFBPPicks")
 def saveFBPPicks():
     fbpLog("fbpadmin@my-fbp.com", "SaveFBPPicksPython", "Saving FBP picks", "INFO")
@@ -132,14 +129,10 @@ def saveFBPPicks():
     }
 
 @app.post("/validateAndFixFBPPicks")
-@tracer.capture_method
 def validateAndFixFBPPicks():
     fbpLog("fbpadmin@my-fbp.com", "SaveFBPPicksPython", "Validating and fixing FBP picks", "INFO")
     FBP_USERS_TABLE_NAME = os.environ.get('FBPUsersTableName', 'FBP-Users')
     FBP_PICKS_TABLE_NAME = os.environ.get('FBPPicksTableName', 'FBP-Picks')
-    tracer.put_annotation(key="operation", value="validateAndFixFBPPicks")
-    tracer.put_annotation(key="picks_table", value=FBP_PICKS_TABLE_NAME)
-    tracer.put_annotation(key="users_table", value=FBP_USERS_TABLE_NAME)
     logger.info(f"Using FBP Picks DynamoDB table: {FBP_PICKS_TABLE_NAME}")
     dynamodb = boto3.resource('dynamodb')
     picksTable = dynamodb.Table(FBP_PICKS_TABLE_NAME)
@@ -152,7 +145,6 @@ def validateAndFixFBPPicks():
             'statusCode': 500,
             'body': json.dumps({'error': 'Could not determine current week'}),
         }
-    tracer.put_annotation(key="week", value=str(week))
     logger.info(f"Validating and fixing picks for week: {week}")
     FBP_SCHEDULE_TABLE_NAME = os.environ.get('FBPScheduleTableName', '2026-Schedule')
     # need to query the schedule table for the week so that I can get the number
@@ -507,6 +499,6 @@ def validateAndFixFBPPicks():
     }
 
 
-@tracer.capture_lambda_handler
+
 def lambda_handler(event, context):
     return app.resolve(event, context)  
