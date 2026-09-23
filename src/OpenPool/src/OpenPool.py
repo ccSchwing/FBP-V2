@@ -5,11 +5,21 @@ import logging
 from botocore.exceptions import ClientError
 from fbplib.fbpLog import fbpLog
 from fbplib.getCurrentWeek import getCurrentWeek
+from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
+from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 
 logging.basicConfig(format="%(levelname)s %(message)s")
 logger = logging.getLogger()
 logger.info("Initializing OpenPool Lambda function")  # Log initialization message
 logger.setLevel(logging.INFO)
+
+cors_config = CORSConfig(
+    allow_origin="*",
+    allow_headers=["Content-Type", "X-Amz-Date", "Authorization", "X-Api-Key", "X-Amz-Security-Token"],
+    max_age=86400,
+    allow_credentials=False,
+)
+app = APIGatewayHttpResolver(cors=cors_config)
 logger.info("OpenPool Lambda function initialized successfully")
 
 lambda_client = boto3.client("lambda")
@@ -102,12 +112,12 @@ def generate_picksheet_pdf(week):
     logging.info(f"HTMLtoPDF result: {result}")
     return result
 
-
-def openPool(event, context):
-    open_pool_status_check(event, context)
-    invoke_import_spreads_and_final_scores(event, context)
-    invoke_calc_weekly_results(event, context)
-    invoke_update_weekly_results(event, context)
+@app.get("/openPool")
+def openPool():
+    open_pool_status_check()
+    invoke_import_spreads_and_final_scores()
+    invoke_calc_weekly_results()
+    invoke_update_weekly_results()
     invoke_advanced_messaging_service()
     import_spreads_and_final_scores_for_new_week()
     set_pool_open()
@@ -118,7 +128,7 @@ def openPool(event, context):
     except Exception as e:
         logging.exception(f"Error generating picksheet PDF: {e}")  # Non-fatal
 
-def open_pool_status_check(event, context):
+def open_pool_status_check():
     # Make user that the pool is closed.
     # If not, bail and log an error.
     FBPConfigTableName = os.environ.get("FBPConfigTableName", "FBP-Config")
@@ -207,7 +217,7 @@ def open_pool_status_check(event, context):
     # This will allow the spreads and final scores to be in place by the time the users
     # start making their picks for the new week.
     ##
-def invoke_import_spreads_and_final_scores(event, context):
+def invoke_import_spreads_and_final_scores():
     powertools_event = {
         "version": "2.0",
         "routeKey": "GET /importSpreadsAndFinalScores",
@@ -273,7 +283,7 @@ def invoke_import_spreads_and_final_scores(event, context):
                 }
             ),
         }
-def invoke_calc_weekly_results(event, context):
+def invoke_calc_weekly_results():
     powertools_event = {
         "version": "2.0",
         "routeKey": "GET /calcWeeklyResults",
@@ -282,9 +292,9 @@ def invoke_calc_weekly_results(event, context):
         "headers": {"content-type": "application/json"},
         "body": json.dumps(
             {
-                "data": event.get("data", {}),
-                "parent_request_id": context.aws_request_id,
-                "timestamp": event.get("timestamp"),
+                "data": app.current_event.raw_event.get("data", {}),
+                "parent_request_id": app.lambda_context.aws_request_id,
+                "timestamp": app.current_event.raw_event.get("timestamp"),
             }
         ),
         "requestContext": {
@@ -364,7 +374,7 @@ def invoke_calc_weekly_results(event, context):
 
     # Next, UpdateWeeklyResults -- this one will update the user's wins/losses and determine the
     # weekly winner.
-def invoke_update_weekly_results(event, context):
+def invoke_update_weekly_results():
     powertools_event = {
         "version": "2.0",
         "routeKey": "GET /updateWeeklyResults",
@@ -373,9 +383,9 @@ def invoke_update_weekly_results(event, context):
         "headers": {"content-type": "application/json"},
         "body": json.dumps(
             {
-                "data": event.get("data", {}),
-                "parent_request_id": context.aws_request_id,
-                "timestamp": event.get("timestamp"),
+                "data": app.current_event.raw_event.get("data", {}),
+                "parent_request_id": app.lambda_context.aws_request_id,
+                "timestamp": app.current_event.raw_event.get("timestamp"),
             }
         ),
         "requestContext": {
@@ -725,18 +735,6 @@ def import_spreads_and_final_scores_for_new_week():
                 }
             ),
         }
-
-from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
-from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
-
-cors_config = CORSConfig(
-    allow_origin="*",
-    allow_headers=["Content-Type", "X-Amz-Date", "Authorization", "X-Api-Key", "X-Amz-Security-Token"],
-    max_age=86400,
-    allow_credentials=False,
-)
-app = APIGatewayHttpResolver(cors=cors_config)
-
 
 @app.post("/generatePicksheetPdf")
 def generatePicksheetPdf():

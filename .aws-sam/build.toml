@@ -350,3 +350,12 @@ compatible_runtimes = ["python3.12"]
 architecture = "x86_64"
 manifest_hash = ""
 layer = "FBPLibLayer"
+
+[layer_build_definitions.21d73992-5012-4bc4-b7df-e6ca0a1015ea]
+layer_name = "FBPBlockChainLayer"
+codeuri = "/Users/ccs/projects/FBP/src/FBPBlockChainLayer"
+build_method = "makefile"
+compatible_runtimes = ["python3.12"]
+architecture = "x86_64"
+manifest_hash = ""
+layer = "FBPBlockChainLayer"

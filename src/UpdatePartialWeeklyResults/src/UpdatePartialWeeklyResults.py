@@ -350,18 +350,12 @@ def updatePartialWeeklyUserResults(allUserPicks: List[Dict[str, Any]], resultsTa
             fbpLog("fbpadmin@my-fbp.com", "UpdatePartialWeeklyResults", 
                    f"Failed to get displayName for {email} from DynamoDB: {e}", "ERROR")
         try:
-            resultsTable.put_item(
-                Item={
-                    'email': email,
-                    'week': Decimal(week),
-                    'correctpicks': correctpicks,
-                    'incorrectpicks': incorrectpicks,
-                    'displayName': displayName
-                }
-        )
-
-        # Still need to calc winner and set totalwins.
-
+            resultsTable.update_item(
+                Key={'email': email},
+                UpdateExpression="SET correctpicks = :c, incorrectpicks = :i, displayName = :d, #w = :w",
+                ExpressionAttributeNames={'#w': 'week'},
+                ExpressionAttributeValues={':c': Decimal(correctpicks), ':i': Decimal(incorrectpicks), ':d': displayName, ':w': Decimal(week)}
+            )
         except ClientError as e:
             logger.exception(f"DynamoDB Error: {e}")
             fbpLog("fbpadmin@my-fbp.com", "UpdatePartialWeeklyResults", f"DynamoDB Error: {e}", "ERROR")

@@ -319,21 +319,18 @@ def updateWeeklyUserResults(allUserPicks: List[Dict[str, Any]], resultsTable, us
             fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", 
                    f"Failed to get displayName for {email} from DynamoDB: {e}", "ERROR")
         try:
-            resultsTable.put_item(
-                Item={
-                    'email': email,
-                    'week': Decimal(week),
-                    'correctpicks': correctpicks,
-                    'incorrectpicks': incorrectpicks,
-                    'displayName': displayName
-                }
-        )
+            resultsTable.update_item(
+                Key={'email': email},
+                UpdateExpression="SET correctpicks = :c, incorrectpicks = :i, displayName = :d, #w = :w",
+                ExpressionAttributeNames={'#w': 'week'},
+                ExpressionAttributeValues={':c': Decimal(correctpicks), ':i': Decimal(incorrectpicks), ':d': displayName, ':w': Decimal(week)}
+            )
 
         # Still need to calc winner and set totalwins.
 
         except ClientError as e:
             logger.exception(f"DynamoDB Error: {e}")
-            fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", f"DynamoDB Error: {e}", "ERROR")
+            # fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", f"DynamoDB Error: {e}")
             return Response(status_code=500, content_type="application/json", body=json.dumps({'error': f'DynamoDB error saving results for {email}'})) 
 
         logger.info(f"Updated weekly results for user: {email} with correct picks: {correctpicks} and incorrect picks: {incorrectpicks}")
@@ -381,7 +378,7 @@ def updateWeeklyUserResults(allUserPicks: List[Dict[str, Any]], resultsTable, us
     max_item = max(items, key=lambda x: x.get('correctpicks', 0))
     email = max_item['email']
     resultsTable.update_item(
-        Key={'email': email, 'week': Decimal(week)},
+        Key={'email': email},
         UpdateExpression="SET #Winner = :w",
         ExpressionAttributeNames={'#Winner': 'winner'},
         ExpressionAttributeValues={':w': True}

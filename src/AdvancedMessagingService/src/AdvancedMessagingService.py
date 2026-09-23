@@ -54,27 +54,21 @@ def _is_opted_in(value: Any) -> bool:
 ##
 def _get_winner() -> Optional[str]:
     """Get the weekly winner's email for the current week."""
-    current_week = getCurrentWeek()
-    if current_week is None:
-        logger.info("Current week is None; cannot get winner")
-        return None
-    winners_table_name = os.environ.get('FBPWeeklyResultsTableName', default='FBP-Weekly-Results-2025')
+    winners_table_name = os.environ.get('FBPWeeklyResultsTableName', default='2026-FBP-Weekly-Results')
     if not winners_table_name:
         logger.info("FBPWeeklyResultsTableName not set; cannot get winner")
         return None
     try:
         table = boto3.resource('dynamodb').Table(winners_table_name)
-        response = table.query(
-            IndexName=os.environ.get('FBPWeeklyResultsWeekIndexName', 'WeekIndex'),
-            KeyConditionExpression='#wk = :wk',
+        response = table.scan(
             FilterExpression='#win = :w',
-            ExpressionAttributeNames={'#wk': 'week', '#win': 'winner'},
-            ExpressionAttributeValues={':wk': current_week, ':w': True},
+            ExpressionAttributeNames={'#win': 'winner'},
+            ExpressionAttributeValues={':w': True},
             ProjectionExpression='email'
         )
         return response.get('Items', [{}])[0].get('email')
     except Exception as e:
-        logger.warning("Failed to get weekly winner", extra={"error": str(e), "week": current_week})
+        logger.warning("Failed to get weekly winner", extra={"error": str(e)})
         return None
 
 
@@ -424,12 +418,12 @@ class EmailService:
         display_name = data.get('display_name', 'the winner')
         week=getCurrentWeek()
         if week is not None:
-            week=decimal.Decimal(week-1)
+            week=int(week)
         subject = f"Congratulations to {display_name} -- Week {week}'s {self.company_name} Winner!"
         html = f"""
         <html><body>
             <h1>Congratulations to {display_name}!</h1>
-            <p>{display_name} is week's {week} {self.company_name} winner. Great job!</p>
+            <p>{display_name} is week {week}'s {self.company_name} winner. Great job!</p>
             <p>Visit: <a href="{self.base_url}">{self.company_name} Home</a> to view the results.</p>
             <p>FAQ: <a href="{self.base_url}/faq.html">FAQ</a></p>
             <p>Questions? <a href="mailto:{self.support_email}"><b>{self.support_email}</b></a></p>
@@ -703,9 +697,9 @@ class SMSService:
         display_name = data.get('display_name', 'the winner')
         week=getCurrentWeek() 
         if week is not None:
-            week=decimal.Decimal(week-1)
+            week=int(week-1)
         return (f"Congratulations to {display_name}!\n"
-                f"{display_name} is this week's {self.company_name} winner for week {week}. Great job!\n"
+                f"{display_name} is the {self.company_name} winner for week {week}. Great job!\n"
                 f"Visit {self.base_url} to view results.\n"
                 f"FAQ: {self.base_url}/faq.html")
     ##
