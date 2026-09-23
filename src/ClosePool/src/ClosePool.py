@@ -66,8 +66,14 @@ def generateGridsheetPdf():
 def closePool():
     logging.info("Handling closePool request")
     fbpLog("fbpadmin@my-fbp.com", "ClosePool", "Handling closePool request", "INFO")
-    # Make user that the pool is closed.
-    # If not, bail and log an error.
+    try:
+        _close_pool_steps()
+    except RuntimeError as e:
+        logging.error(f"closePool halted: {e}")
+        fbpLog("fbpadmin@my-fbp.com", "ClosePool", f"closePool halted: {e}", "ERROR")
+        return {"statusCode": 500, "body": json.dumps({"status": "error", "message": str(e)})}
+
+def _close_pool_steps():
     FBPConfigTableName = os.environ.get("FBPConfigTableName", "FBP-Config")
     configTable = boto3.resource("dynamodb").Table(FBPConfigTableName)
     current_week = getCurrentWeek()
@@ -85,15 +91,7 @@ def closePool():
                     f"Pool is already closed for week {current_week}. Cannot proceed with closing the pool for the current week.",
                     "ERROR",
                 )
-                return {
-                    "statusCode": 400,
-                    "body": json.dumps(
-                        {
-                            "status": "error",
-                            "message": f"Pool is already closed for week {current_week}. Cannot proceed with closing the pool for the current week.",
-                        }
-                    ),
-                }
+                raise RuntimeError(f"Pool is already closed for week {current_week}. Cannot proceed with closing the pool for the current week.")
             else:
                 logging.info(
                     f"Pool is currently open for week {current_week}. Proceeding with closing the pool for the current week."
@@ -117,15 +115,7 @@ def closePool():
                 f"Configuration for current week {current_week} not found.",
                 "ERROR",
             )
-            return {
-                "statusCode": 404,
-                "body": json.dumps(
-                    {
-                        "status": "error",
-                        "message": f"Configuration for current week {current_week} not found.",
-                    }
-                ),
-            }
+            raise RuntimeError(f"Configuration for current week {current_week} not found.")
 
     except ClientError as e:
         logging.exception(f"Error checking pool status for week {current_week}: {e}")
@@ -135,15 +125,7 @@ def closePool():
             f"Error checking pool status for week {current_week}: {e}",
             "ERROR",
         )
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"Error checking pool status for week {current_week}: {e}",
-                }
-            ),
-        }
+        raise RuntimeError(f"Error checking pool status for week {current_week}: {e}")
 
     # Defind the lambda client
     lambda_client = boto3.client("lambda")
@@ -201,43 +183,9 @@ def closePool():
                 logging.info(f"SaveFBPPicks Body: {body}")
                 logging.info("SaveFBPPicks succeeded, proceeding to next steps.")
         else:
-            logging.error(
-                f"SaveFBPPicks failed with status code: {result.get('statusCode')}"
-            )
-            return {
-                "statusCode": 500,
-                "body": json.dumps(
-                    {
-                        "status": "error",
-                        "message": f"SaveFBPPicks failed with status code: {result.get('statusCode')}",
-                        "details": result.get("body", {}),
-                    }
-                ),
-            }
-    except ClientError as e:
-        logging.exception(f"Error invoking SaveFBPPicks Lambda: {e}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"Error invoking SaveFBPPicks Lambda: {e}",
-                    "details": str(e),
-                }
-            ),
-        }
-    except Exception as e:
-        logging.exception(f"Unexpected error: {e}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"Unexpected error: {e}",
-                    "details": str(e),
-                }
-            ),
-        }
+            raise RuntimeError(f"SaveFBPPicks failed with status code: {result.get('statusCode')}")
+    except (ClientError, Exception) as e:
+        raise RuntimeError(f"Error invoking SaveFBPPicks Lambda: {e}")
 
     ##
     # Send gridsheet via AdvancedMessagingService for each channel.
@@ -271,17 +219,7 @@ def closePool():
         result = json.loads(response["Payload"].read())
         logging.info(f"AdvancedMessagingService [{channel}] Result: {result}")
         if not result.get("success"):
-            logging.error(f"AdvancedMessagingService [{channel}] failed with status code: {result.get('error')}")
-            return {
-                "statusCode": 500,
-                "body": json.dumps(
-                    {
-                        "status": "error",
-                        "message": f"AdvancedMessagingService [{channel}] failed with error: {result.get('error')}",
-                        "details": result,
-                    }
-                ),
-            }
+            raise RuntimeError(f"AdvancedMessagingService [{channel}] failed with error: {result.get('error')}")
 
     # Get the Lambda function name from environment variable or use a default value
     setPoolStatusClosed = os.environ.get("SetPoolStatusClosed", "SetPoolStatusClosed")
@@ -328,43 +266,9 @@ def closePool():
                 logging.info(f"SetPoolStatusClosed Body: {body}")
                 logging.info("SetPoolStatusClosed succeeded, proceeding to next steps.")
         else:
-            logging.error(
-                f"SetPoolStatusClosed failed with status code: {result.get('statusCode')}"
-            )
-            return {
-                "statusCode": 500,
-                "body": json.dumps(
-                    {
-                        "status": "error",
-                        "message": f"SetPoolStatusClosed failed with status code: {result.get('statusCode')}",
-                        "details": result.get("body", {}),
-                    }
-                ),
-            }
-    except ClientError as e:
-        logging.exception(f"Error invoking SetPoolStatusClosed Lambda: {e}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"Error invoking SetPoolStatusClosed Lambda: {e}",
-                    "details": str(e),
-                }
-            ),
-        }
-    except Exception as e:
-        logging.exception(f"Unexpected error: {e}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"Unexpected error: {e}",
-                    "details": str(e),
-                }
-            ),
-        }
+            raise RuntimeError(f"SetPoolStatusClosed failed with status code: {result.get('statusCode')}")
+    except (ClientError, Exception) as e:
+        raise RuntimeError(f"Error invoking SetPoolStatusClosed Lambda: {e}")
 
     try:
         pdf_result = generate_gridsheet_pdf(current_week)
@@ -481,5 +385,4 @@ def generate_gridsheet_pdf(week):
 @tracer.capture_lambda_handler
 def lambda_handler(event, context) -> dict[str, Any]:
     logging.info(f"Received event: {event}")
-    logger.info("ccs was here!")
     return app.resolve(event, context)

@@ -114,19 +114,24 @@ def generate_picksheet_pdf(week):
 
 @app.get("/openPool")
 def openPool():
-    open_pool_status_check()
-    invoke_import_spreads_and_final_scores()
-    invoke_calc_weekly_results()
-    invoke_update_weekly_results()
-    invoke_advanced_messaging_service()
-    import_spreads_and_final_scores_for_new_week()
-    set_pool_open()
     try:
-        week = getCurrentWeek()
-        pdf_result = generate_picksheet_pdf(week)
-        logging.info(f"Picksheet PDF generated: {pdf_result}")
-    except Exception as e:
-        logging.exception(f"Error generating picksheet PDF: {e}")  # Non-fatal
+        open_pool_status_check()
+        invoke_import_spreads_and_final_scores()
+        invoke_calc_weekly_results()
+        invoke_update_weekly_results()
+        invoke_advanced_messaging_service()
+        import_spreads_and_final_scores_for_new_week()
+        set_pool_open()
+        try:
+            week = getCurrentWeek()
+            pdf_result = generate_picksheet_pdf(week)
+            logging.info(f"Picksheet PDF generated: {pdf_result}")
+        except Exception as e:
+            logging.exception(f"Error generating picksheet PDF: {e}")  # Non-fatal
+    except RuntimeError as e:
+        logging.error(f"openPool halted: {e}")
+        fbpLog("fbpadmin@my-fbp.com", "openPool", f"openPool halted: {e}", "ERROR")
+        return {"statusCode": 500, "body": json.dumps({"status": "error", "message": str(e)})}
 
 def open_pool_status_check():
     # Make user that the pool is closed.
@@ -148,15 +153,7 @@ def open_pool_status_check():
                     f"Pool is still open for week {current_week}. Cannot proceed with opening the pool for the new week.",
                     "ERROR",
                 )
-                return {
-                    "statusCode": 400,
-                    "body": json.dumps(
-                        {
-                            "status": "error",
-                            "message": f"Pool is still open for week {current_week}. Cannot proceed with opening the pool for the new week.",
-                        }
-                    ),
-                }
+                raise RuntimeError(f"Pool is still open for week {current_week}. Cannot proceed with opening the pool for the new week.")
             else:
                 logging.info(
                     f"Pool is closed for week {current_week}. Proceeding with opening the pool for the new week."
@@ -175,15 +172,7 @@ def open_pool_status_check():
                 f"Configuration for current week {current_week} not found.",
                 "ERROR",
             )
-            return {
-                "statusCode": 404,
-                "body": json.dumps(
-                    {
-                        "status": "error",
-                        "message": f"Configuration for current week {current_week} not found.",
-                    }
-                ),
-            }
+            raise RuntimeError(f"Configuration for current week {current_week} not found.")
 
     except ClientError as e:
         logging.exception(f"Error checking pool status for week {current_week}: {e}")
@@ -193,15 +182,7 @@ def open_pool_status_check():
             f"Error checking pool status for week {current_week}: {e}",
             "ERROR",
         )
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"Error checking pool status for week {current_week}: {e}",
-                }
-            ),
-        }
+        raise RuntimeError(f"Error checking pool status for week {current_week}: {e}")
 
     ##
     # Green light.  Let's do this thing.  : -)
@@ -269,20 +250,7 @@ def invoke_import_spreads_and_final_scores():
             f"ImportSpreadsAndFinalScores failed with status code: {response.get('StatusCode')}.",
             "ERROR",
         )
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"ImportSpreadsAndFinalScores failed with status code: {response.get('StatusCode')}",
-                    "details": (
-                        response.get("Payload").read().decode("utf-8")
-                        if response.get("Payload")
-                        else {}
-                    ),
-                }
-            ),
-        }
+        raise RuntimeError(f"ImportSpreadsAndFinalScores failed with status code: {response.get('StatusCode')}")
 def invoke_calc_weekly_results():
     powertools_event = {
         "version": "2.0",
@@ -336,40 +304,9 @@ def invoke_calc_weekly_results():
             logging.error(
                 f"Calc Weekly Results failed with status code: {result.get('statusCode')}"
             )
-            return {
-                "statusCode": 500,
-                "body": json.dumps(
-                    {
-                        "status": "error",
-                        "message": f"Calc Weekly Results failed with status code: {result.get('statusCode')}",
-                        "details": result.get("body", {}),
-                    }
-                ),
-            }
-    except ClientError as e:
-        logging.exception(f"Error invoking Calc Weekly Results Lambda: {e}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"Error invoking Calc Weekly Results Lambda: {e}",
-                    "details": str(e),
-                }
-            ),
-        }
-    except Exception as e:
-        logging.exception(f"Unexpected error: {e}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"Unexpected error: {e}",
-                    "details": str(e),
-                }
-            ),
-        }
+            raise RuntimeError(f"Calc Weekly Results failed with status code: {result.get('statusCode')}")
+    except (ClientError, Exception) as e:
+        raise RuntimeError(f"Error invoking Calc Weekly Results Lambda: {e}")
 
 
     # Next, UpdateWeeklyResults -- this one will update the user's wins/losses and determine the
@@ -444,40 +381,9 @@ def invoke_update_weekly_results():
                 f"UpdateWeeklyResults failed with status code: {result.get('statusCode')}",
                 "ERROR",
             )
-            return {
-                "statusCode": 500,
-                "body": json.dumps(
-                    {
-                        "status": "error",
-                        "message": f"UpdateWeeklyResults failed with status code: {result.get('statusCode')}",
-                        "details": result.get("body", {}),
-                    }
-                ),
-            }
-    except ClientError as e:
-        logging.exception(f"Error invoking UpdateWeeklyResults Lambda: {e}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"Error invoking UpdateWeeklyResults Lambda: {e}",
-                    "details": str(e),
-                }
-            ),
-        }
-    except Exception as e:
-        logging.exception(f"Unexpected error: {e}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"Unexpected error: {e}",
-                    "details": str(e),
-                }
-            ),
-        }
+            raise RuntimeError(f"UpdateWeeklyResults failed with status code: {result.get('statusCode')}")
+    except (ClientError, Exception) as e:
+        raise RuntimeError(f"Error invoking UpdateWeeklyResults Lambda: {e}")
 
     ## Call AdvancedMessagingService Lambda to send out the picksheet notification to
     # subscribed users.
@@ -522,13 +428,7 @@ def invoke_advanced_messaging_service():
         )
     result = json.loads(response["Payload"].read())
     if not result.get("success"):
-        logging.error(f"SendMessage failed: {result.get('error')}")
-        fbpLog(
-                "fbpadmin@my-fbp.com",
-                "openPool",
-                f"SendMessage failed: {result.get('error')}",
-                "ERROR",
-            )
+        raise RuntimeError(f"SendMessage (sms/picksheet) failed: {result.get('error')}")
 
     logging.info(f"SendMessage Response: {response}")
     fbpLog(
@@ -544,6 +444,10 @@ def invoke_advanced_messaging_service():
             InvocationType="RequestResponse",
             Payload=json.dumps(sendMessageEvent),
         )
+    result = json.loads(response["Payload"].read())
+    if not result.get("success"):
+        raise RuntimeError(f"SendMessage (email/picksheet) failed: {result.get('error')}")
+
     logging.info(f"SendMessage Response: {response}")
     fbpLog(
         "fbpadmin@my-fbp.com", "openPool", f"SendMessage Response: {response}", "INFO"
@@ -561,13 +465,7 @@ def invoke_advanced_messaging_service():
     )
     result = json.loads(response["Payload"].read())
     if not result.get("success"):
-            logging.error(f"SendMessage failed: {result.get('error')}")
-            fbpLog(
-                "fbpadmin@my-fbp.com",
-                "openPool",
-                f"SendMessage failed: {result.get('error')}",
-                "ERROR",
-            )
+        raise RuntimeError(f"SendMessage (sms/weeklywinner) failed: {result.get('error')}")
 
     logging.info(f"SendMessage Response: {response}")
     fbpLog(
@@ -585,13 +483,7 @@ def invoke_advanced_messaging_service():
         )
     result = json.loads(response["Payload"].read())
     if not result.get("success"):
-        logging.error(f"SendMessage failed: {result.get('error')}")
-        fbpLog(
-                "fbpadmin@my-fbp.com",
-                "openPool",
-                f"SendMessage failed: {result.get('error')}",
-                "ERROR",
-            )
+        raise RuntimeError(f"SendMessage (email/weeklywinner) failed: {result.get('error')}")
 
     logging.info(f"SendMessage Response: {response}")
     fbpLog(
@@ -645,20 +537,7 @@ def set_pool_open():
         logging.error(
             f"SetPoolStatusOpen failed with status code: {response.get('StatusCode')}"
         )
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"SetPoolStatusOpen failed with status code: {response.get('StatusCode')}",
-                    "details": (
-                        response.get("Payload").read().decode("utf-8")
-                        if response.get("Payload")
-                        else {}
-                    ),
-                }
-            ),
-        }
+        raise RuntimeError(f"SetPoolStatusOpen failed with status code: {response.get('StatusCode')}")
         ##
     ##
     # Call the ImportSpreadsAndFinalScores Lambda to import the spreads for the new week.
@@ -721,20 +600,7 @@ def import_spreads_and_final_scores_for_new_week():
             f"ImportSpreadsAndFinalScores failed with status code: {response.get('StatusCode')}.",
             "ERROR",
         )
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "error",
-                    "message": f"ImportSpreadsAndFinalScores failed with status code: {response.get('StatusCode')}",
-                    "details": (
-                        response.get("Payload").read().decode("utf-8")
-                        if response.get("Payload")
-                        else {}
-                    ),
-                }
-            ),
-        }
+        raise RuntimeError(f"ImportSpreadsAndFinalScores (new week) failed with status code: {response.get('StatusCode')}")
 
 @app.post("/generatePicksheetPdf")
 def generatePicksheetPdf():
