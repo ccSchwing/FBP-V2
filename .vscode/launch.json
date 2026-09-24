@@ -171,6 +171,25 @@
         }
       ]
     },
+
+    {
+      "name": "Python: Attach to UpdateTeamRecords",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Attach to UpdateTeamRecords",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/UpdateTeamRecords/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },
+
     {
       "name": "Python: Attach to StoreSMSVerificationCode",
       "type": "debugpy",

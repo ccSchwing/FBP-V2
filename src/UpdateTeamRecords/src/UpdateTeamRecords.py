@@ -7,14 +7,12 @@ from decimal import Decimal
 import boto3
 from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
-from aws_lambda_powertools import Tracer
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 
 from fbplib.decimalDefault import decimal_default
 from fbplib.getCurrentWeek import getCurrentWeek
 
-tracer = Tracer()
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -32,7 +30,6 @@ def _as_bool(value: str) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
-@tracer.capture_method
 @app.get("/updateTeamRecords")
 def updateTeamRecords() -> Response:
     logger.info("Fetching team records")
@@ -42,7 +39,8 @@ def updateTeamRecords() -> Response:
         schedule_table = dynamodb.Table(os.environ["FBPScheduleTableName"])
 
         current_week = getCurrentWeek() or 1
-        completed_week = max(0, int(current_week) - 1)
+        #completed_week = max(0, int(current_week) - 1)
+        completed_week = int(current_week)
         query_params = app.current_event.query_string_parameters or {}
         include_diagnostics = _as_bool(query_params.get("diagnostics", "true"))
 
@@ -59,7 +57,7 @@ def updateTeamRecords() -> Response:
             items.extend(weeks_response.get("Items", []))
 
         items.sort(key=lambda x: x.get("Week", 0))
-
+        logger.info(f"Completed processing schedule items for {completed_week} week")
         # Recompute role-based records from scratch so each run is deterministic.
         team_records_totals = defaultdict(
             lambda: {
@@ -178,6 +176,5 @@ def updateTeamRecords() -> Response:
         )
 
 
-@tracer.capture_lambda_handler
 def lambda_handler(event, context):
     return app.resolve(event, context)

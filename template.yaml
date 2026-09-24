@@ -1869,14 +1869,18 @@ Resources:
             TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-FBP-Config"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBPBlockchain"
       Environment:
         Variables:
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
           FBPPicksTableName: !Sub "${Year}-FBP-Picks"
           FBPLogsTableName: !Sub "${Year}-Log"
           FBPUsersTableName: !Sub "${Year}-FBP-Users"
+          FBPBlockChainTableName: !Sub "${Year}-FBPBlockchain"
       Layers:
         - !Ref FBPLibLayer
+        - !Ref FBPBlockChainLayer
       Events:
         SaveFBPPicksPOST:
           Type: HttpApi
