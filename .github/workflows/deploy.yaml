@@ -44,7 +44,7 @@ jobs:
           ls -lh weasyprint-layer/weasyprint-layer.zip
       - name: Build and Deploy Lambda Functions
         run: |
-          sam build          # Finds ./template.yaml
+          sam build --use-container           # Finds ./template.yaml
           sam deploy --stack-name $STACK_NAME --s3-bucket $S3_LAMBDA_BUCKET --capabilities CAPABILITY_IAM --no-confirm-changeset --no-fail-on-empty-changeset    
       - name: Build FBP App
         run: |
