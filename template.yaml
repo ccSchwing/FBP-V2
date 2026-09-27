@@ -27,16 +27,12 @@ Parameters:
   FBPWeeklyResultsTableName:
     Type: String
     Default: FBP-Weekly-Results
-  # This is the new weekly results table that will be used going forward.
-  # It uses a Global Secondary Index on WeekIndex to make it easier to query by week.
-  # It will replace the original FBPWeeklyResultsTableName after
-  # we verify the new one is working correctly and update all code to use it.
-  # FBPWeeklyResults2025TableName:
-  #   Type: String
-  #   Default: FBP-Weekly-Results-2025
   FBPBlockChainTableName:
     Type: String
     Default: FBPBlockchain
+  FBPBlockChainEmailIndexName:
+    Type: String
+    Default: email-index
   FBPTeamRecordsTableName:
     Type: String
     Default: Record
@@ -159,9 +155,18 @@ Resources:
       AttributeDefinitions:
         - AttributeName: index
           AttributeType: N
+        - AttributeName: email
+          AttributeType: S
       KeySchema:
         - AttributeName: index
           KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: email-index
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
   
   TransactionsTable:
     Type: AWS::DynamoDB::Table

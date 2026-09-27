@@ -12,8 +12,6 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig, ProxyEventType
 from fbplib.fbpLog import fbpLog
 from fbplib.getCurrentWeek import getCurrentWeek
-from aws_lambda_powertools import Tracer
-tracer = Tracer()
 
 
 
@@ -61,7 +59,6 @@ def generateGridsheetPdf():
     return {"statusCode": 200, "body": json.dumps({"result": result})}
 
 
-@tracer.capture_method
 @app.get("/closePool")
 def closePool():
     logging.info("Handling closePool request")
@@ -126,7 +123,19 @@ def _close_pool_steps():
             "ERROR",
         )
         raise RuntimeError(f"Error checking pool status for week {current_week}: {e}")
-
+    ##
+    # Call generateGridsheet Lambda function to generate the gridsheet for the current week.
+    try:
+        generate_gridsheet_pdf(current_week)
+    except Exception as e:
+        logging.exception(f"Error generating gridsheet for week {current_week}: {e}")
+        fbpLog(
+            "fbpadmin@my-fbp.com",
+            "ClosePool",
+            f"Error generating gridsheet for week {current_week}: {e}",
+            "ERROR",
+        )
+        raise RuntimeError(f"Error generating gridsheet for week {current_week}: {e}")
     # Defind the lambda client
     lambda_client = boto3.client("lambda")
 
@@ -190,7 +199,7 @@ def _close_pool_steps():
     ##
     # Send gridsheet via AdvancedMessagingService for each channel.
     advancedMessagingServiceFunction = os.environ.get("AdvancedMessagingService", "AdvancedMessagingService")
-    for channel in ["email", "sms"]:
+    for channel in ["email"]:
         powertools_event = {
             "version": "2.0",
             "routeKey": "POST /advanced-messaging",
@@ -382,7 +391,6 @@ def generate_gridsheet_pdf(week):
     return result
 
 
-@tracer.capture_lambda_handler
 def lambda_handler(event, context) -> dict[str, Any]:
     logging.info(f"Received event: {event}")
     return app.resolve(event, context)
