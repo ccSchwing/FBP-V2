@@ -288,48 +288,48 @@ Resources:
       BuildMethod: makefile
       
 
-  TwilioLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      LayerName: twilio-layer
-      Description: Twilio Python SDK
-      ContentUri: twilio-layer/twilio-layer.zip
-      CompatibleRuntimes:
-        - python3.12
-  TwilioWebHook:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub ${AWS::StackName}-twilio-webhook
-      CodeUri: src/TwilioWebHook/src/
-      Handler: TwilioWebHook.lambda_handler
-      Runtime: python3.12
-      Layers:
-        - !Ref FBPLibLayer
-        - !Ref TwilioLayer
-      Environment:
-        Variables:
-          TwilioOptOutTableName: !Sub "${Year}-FBP-SMS-Opt-Outs"
-          FBPLogsTableName: !Sub "${Year}-Log"
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Sub "${Year}-FBP-SMS-Opt-Outs"
-        - DynamoDBCrudPolicy:
-            TableName: !Sub "${Year}-Log"
-      Events:
-        TwilioWebHookPost:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref FBPHttpApi
-            Path: /twilio-webhook
-            Method: post
-            PayloadFormatVersion: '2.0'
-        TwilioWebHookOptionsApi:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref FBPHttpApi
-            Path: /twilio-webhook
-            Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+  # TwilioLayer:
+  #   Type: AWS::Serverless::LayerVersion
+  #   Properties:
+  #     LayerName: twilio-layer
+  #     Description: Twilio Python SDK
+  #     ContentUri: twilio-layer/twilio-layer.zip
+  #     CompatibleRuntimes:
+  #       - python3.12
+  # TwilioWebHook:
+  #   Type: AWS::Serverless::Function
+  #   Properties:
+  #     FunctionName: !Sub ${AWS::StackName}-twilio-webhook
+  #     CodeUri: src/TwilioWebHook/src/
+  #     Handler: TwilioWebHook.lambda_handler
+  #     Runtime: python3.12
+  #     Layers:
+  #       - !Ref FBPLibLayer
+  #       - !Ref TwilioLayer
+  #     Environment:
+  #       Variables:
+  #         TwilioOptOutTableName: !Sub "${Year}-FBP-SMS-Opt-Outs"
+  #         FBPLogsTableName: !Sub "${Year}-Log"
+  #     Policies:
+  #       - DynamoDBCrudPolicy:
+  #           TableName: !Sub "${Year}-FBP-SMS-Opt-Outs"
+  #       - DynamoDBCrudPolicy:
+  #           TableName: !Sub "${Year}-Log"
+  #     Events:
+  #       TwilioWebHookPost:
+  #         Type: HttpApi
+  #         Properties:
+  #           ApiId: !Ref FBPHttpApi
+  #           Path: /twilio-webhook
+  #           Method: post
+  #           PayloadFormatVersion: '2.0'
+  #       TwilioWebHookOptionsApi:
+  #         Type: HttpApi
+  #         Properties:
+  #           ApiId: !Ref FBPHttpApi
+  #           Path: /twilio-webhook
+  #           Method: OPTIONS
+  #           PayloadFormatVersion: '2.0'
   WeasyprintLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
@@ -951,7 +951,7 @@ Resources:
       Tracing: Active
       Layers:
         - !Ref FBPLibLayer
-        - !Ref TwilioLayer
+        # - !Ref TwilioLayer
       Events:
         AdvancedMessagingServicePost:
           Type: HttpApi
@@ -1030,7 +1030,7 @@ Resources:
       Tracing: Active
       Layers:
         - !Ref FBPLibLayer
-        - !Ref TwilioLayer
+        # - !Ref TwilioLayer
       Events:
         AdvancedSMSServicePost:
           Type: HttpApi
@@ -1207,7 +1207,7 @@ Resources:
           TWILIO_CREDENTIALS_SECRET_ARN: !Ref TwilioCredentialsSecretArn
       Layers:
         - !Ref FBPLibLayer
-        - !Ref TwilioLayer
+        # - !Ref TwilioLayer
       Events:
         StoreSMSVerificationCodePost:
           Type: HttpApi
@@ -2353,11 +2353,7 @@ Outputs:
   #   Value: !Ref TwilioWebHook
   #   Export:
   #     Name: !Sub "${AWS::StackName}-twilio-webhook"
-  TwilioWebhookEndpoint:
-    Description: Endpoint for the TwilioWebhook API
-    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/twilio-webhook
-    Export:
-      Name: !Sub ${AWS::StackName}-twilio-webhook-endpoint
+  #    Name: !Sub ${AWS::StackName}-twilio-webhook-endpoint
   SMSVerificationFunctionName:
     Description: Name of the SMSValidationUtils Lambda function
     Value: !Ref SMSValidationUtils
