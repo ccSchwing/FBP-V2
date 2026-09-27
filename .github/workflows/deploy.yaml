@@ -32,11 +32,11 @@ jobs:
         with:
           use-installer: true
 
-      - name: Restore Twilio Layer Artifact
-        run: |
-          mkdir -p twilio-layer
-          aws s3 cp s3://$S3_BUCKET/twilio-layer/twilio-layer.zip twilio-layer/twilio-layer.zip
-          ls -lh twilio-layer/twilio-layer.zip
+      # - name: Restore Twilio Layer Artifact
+      #   run: |
+      #     mkdir -p twilio-layer
+      #     aws s3 cp s3://$S3_BUCKET/twilio-layer/twilio-layer.zip twilio-layer/twilio-layer.zip
+      #     ls -lh twilio-layer/twilio-layer.zip
 
       - name: Build and Deploy Lambda Functions
         run: |
