@@ -26,7 +26,7 @@ def chatbot(event, context):
             
         user_question = body.get('question', '')
         blockchain = Blockchain()
-        blockchain.add_block(user_question)
+        blockchain.add_block(user_question, action="ChatBot")
         blockchain.is_valid()
         session_id = body.get('sessionId', '')
         

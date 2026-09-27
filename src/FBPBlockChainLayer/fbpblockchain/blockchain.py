@@ -1,10 +1,11 @@
 import os
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import pytz
 import boto3
 import logging
-from fbplib.decimalDefault import decimal_default
+from boto3.dynamodb.conditions import Key
 
 
 logging.basicConfig(format="%(levelname)s %(message)s")
@@ -14,24 +15,24 @@ logger.setLevel(logging.INFO)
 logger.info("FBPBlockChain Lambda function initialized successfully")
 
 
-TABLE_NAME = os.getenv("FBPBlockChainTableName", "2026-FBPBlockchain")
-print(f"TABLE_NAME: {TABLE_NAME}")
+FBP_BLOCKCHAIN_TABLE_NAME = os.getenv("FBPBlockChain", "2026-FBPBlockchain")
+print(f"FBP_BLOCKCHAIN_TABLE_NAME: {FBP_BLOCKCHAIN_TABLE_NAME}")
 
-from decimal import Decimal
-
-
-class DecimalEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Decimal):
-            return int(obj) if obj % 1 == 0 else float(obj)
-        return super().default(obj)
 
 class Block:
-    def __init__(self, index, data, previous_hash, timestamp=None):
-        self.index = int(index)
-        self.timestamp = timestamp or datetime.now(timezone.utc).isoformat()
+    ##
+    # add email as optional field
+    ##
+    
+    def __init__(self, index, data, previous_hash, timestamp=None, email=None, action=None):
+        self.index = index
+        self.email = email or (data.get("email") if isinstance(data, dict) else None)
+        mytimestamp=pytz.timezone("America/New_York").localize(datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+        self.timestamp = timestamp or mytimestamp 
+        logger.info(f"Block timestamp set to: {self.timestamp}")
         self.data = data
         self.previous_hash = previous_hash
+        self.action = action
         self.hash = self._compute_hash()
 
     def _compute_hash(self):
@@ -39,20 +40,22 @@ class Block:
             "index": self.index,
             "timestamp": self.timestamp,
             "data": self.data,
+            "email": self.email,
             "previous_hash": self.previous_hash,
-        }, sort_keys=True, default=decimal_default)
+            "action": self.action,
+        }, sort_keys=True)
         return hashlib.sha256(block_string.encode()).hexdigest()
 
 
 class Blockchain:
     def __init__(self):
-        print(f"Initializing Blockchain with table: {TABLE_NAME}")
-        self.table = boto3.resource("dynamodb").Table(TABLE_NAME)
+        print(f"Initializing Blockchain with table: {FBP_BLOCKCHAIN_TABLE_NAME}")
+        self.table = boto3.resource("dynamodb").Table(FBP_BLOCKCHAIN_TABLE_NAME)
         print(f"Blockchain initialized with table: {self.table}")
         self.chain = self._load_chain()
 
     def _load_chain(self):
-        print(f"Loading blockchain from DynamoDB table: {TABLE_NAME}")
+        print(f"Loading blockchain from DynamoDB table: {FBP_BLOCKCHAIN_TABLE_NAME}")
         response = self.table.scan()
         items = sorted(response.get("Items", []), key=lambda x: int(x["index"]))
         if not items:
@@ -60,28 +63,33 @@ class Blockchain:
             self._save_block(genesis)
             return [genesis]
         return [
-            Block(int(item["index"]), item["data"], item["previous_hash"], item["timestamp"])
+            Block(int(item["index"]), item["data"], item["previous_hash"], item["timestamp"], email=item.get("email"))
             for item in items
         ]
 
     def _create_genesis_block(self):
-        return Block(0, "Genesis Block", "0")
+        return Block(0, "Genesis Block", "0", email="genesis@blockchain.com")
 
     def _save_block(self, block):
-        self.table.put_item(Item={
+        item = {
             "index": block.index,
             "timestamp": block.timestamp,
             "data": block.data,
             "previous_hash": block.previous_hash,
             "hash": block.hash,
-        })
+        }
+        if block.email:
+            item["email"] = block.email
+        if block.action:
+            item["action"] = block.action
+        self.table.put_item(Item=item)
 
     @property
     def latest_block(self):
         return self.chain[-1]
 
-    def add_block(self, data):
-        block = Block(len(self.chain), data, self.latest_block.hash)
+    def add_block(self, data, email=None, action=None):
+        block = Block(len(self.chain), data, self.latest_block.hash, email=email, action=action)
         self._save_block(block)
         self.chain.append(block)
         return block

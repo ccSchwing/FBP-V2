@@ -74,7 +74,7 @@ def saveFBPPicks():
 
     week=getCurrentWeek()
     if week is None:
-        BC.add_block("Error: Could not determine current week")
+        BC.add_block("Error: Could not determine current week", action="Error")
         fbpLog("fbpadmin@my-fbp.com", "SaveFBPPicksPython", "Could not determine current week", "ERROR")
         return {
             'statusCode': 500,
@@ -84,7 +84,7 @@ def saveFBPPicks():
     try:
         body = app.current_event.json_body
         if not isinstance(body, dict):
-            BC.add_block("Error: Request body must be a JSON object")
+            BC.add_block("Error: Request body must be a JSON object", action="Error")
             raise ValueError("Request body must be a JSON object")
         logger.info(f"Parsed JSON body: {body}")
         email = body.get('email')
@@ -114,7 +114,7 @@ def saveFBPPicks():
             ExpressionAttributeNames={'#picks': 'picks', '#tieBreaker': 'tieBreaker', '#week': 'week', '#picksMadeBy': 'picksMadeBy'},
             ExpressionAttributeValues={':p': picks, ':t': tieBreaker, ':w': week, ':pmb': 'user'}
         )
-        BC.add_block(f"Successfully saved picks: {picks} and tieBreaker: {tieBreaker} for email: {email} and week: {week}")
+        BC.add_block(f"Successfully saved picks: {picks} and tieBreaker: {tieBreaker} for email: {email} and week: {week}", email=email, action="SaveFBPPicks")
         logger.info(f"Successfully saved picks: {picks} and tieBreaker: {tieBreaker} for email: {email} and week: {week}")
         fbpLog(email, "SaveFBPPicksPython", f"Successfully saved picks: {picks} and tieBreaker: {tieBreaker} for week {week}", "INFO")
     except ClientError as e:
@@ -126,7 +126,7 @@ def saveFBPPicks():
             'body': json.dumps({'error': 'DynamoDB Error'}),
         }
     except Exception as e:
-        BC.add_block(f"Unexpected error: {e}")
+        BC.add_block(f"Unexpected error: {e}", action="Error")
         logger.error(f"Unexpected error: {e}")
         fbpLog("fbpadmin@my-fbp.com", "SaveFBPPicksPython", f"Unexpected error: {e}", "ERROR")
         return {
@@ -150,7 +150,7 @@ def validateAndFixFBPPicks():
 
     week=getCurrentWeek()
     if week is None:
-        BC.add_block("Error: /validateAndFixFBPPicks - Could not determine current week")
+        BC.add_block("Error: /validateAndFixFBPPicks - Could not determine current week", action="Error")
         fbpLog("fbpadmin@my-fbp.com", "SaveFBPPicksPython", "Could not determine current week", "ERROR")
         return {
             'statusCode': 500,
@@ -166,7 +166,7 @@ def validateAndFixFBPPicks():
     )
     schedule = response.get('Items', [])
     if not schedule:
-        BC.add_block(f"Error: /validateAndFixFBPPicks - No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table for week {week}")
+        BC.add_block(f"Error: /validateAndFixFBPPicks - No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table for week {week}", action="ValidatePicks")
         logger.error(f"No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table for week {week}")
         fbpLog("fbpadmin@my-fbp.com", "method: validateAndFixFBPPicks", f"No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table for week {week}", "ERROR")
         return Response(
@@ -293,7 +293,7 @@ def validateAndFixFBPPicks():
             # Handle the case where there are no picks.
             if picks is None:
                 noPicks = True
-                BC.add_block(f"No picks found for email: {email}, setting noPicks flag to True")
+                BC.add_block(f"No picks found for email: {email}, setting noPicks flag to True", email=email, action="ValidatePicks")
                 logger.warning(f"No picks found for email: {email}, setting noPicks flag to True")
                 fbpLog(email=email, action="method: validateAndFixFBPPicks", details=f"No picks found for email: {email}, setting noPicks flag to True", level="WARNING")
             algorithm = user.get('defaultAlgorithm')
@@ -402,7 +402,7 @@ def validateAndFixFBPPicks():
                     )
                     schedule = response.get('Items', [])
                     if not schedule:
-                        BC.add_block(f"/validateAndFixFBPPicks - No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table for week {week}")
+                        BC.add_block(f"/validateAndFixFBPPicks - No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table for week {week},", action="ValidatePicks")
                         logger.error(f"No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table")
                         fbpLog("fbpadmin@my-fbp.com", "method: validateAndFixFBPPicks", f"No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table", "ERROR")
                         return Response(
@@ -494,7 +494,7 @@ def validateAndFixFBPPicks():
         logger.info(f"Successfully validated and fixed picks: {picks} and tieBreaker: {tieBreaker} for week {week}")
         fbpLog(email, "SaveFBPPicksPython", f"Successfully validated and fixed picks: {picks} and tieBreaker: {tieBreaker} for week {week}", "INFO")
     except ClientError as e:
-        BC.add_block(f"/validateAndFixFBPPicks - DynamoDB Error: {e}")
+        BC.add_block(f"/validateAndFixFBPPicks - DynamoDB Error: {e}", action="Error")
         logger.error(f"DynamoDB Error: {e}")
         fbpLog(email="fbpadmin@my-fbp.com", action="method: validateAndFixFBPPicks", details=f"DynamoDB Error: {e}", level="ERROR")
         return{
@@ -508,7 +508,7 @@ def validateAndFixFBPPicks():
             'statusCode': 500,
             'body': json.dumps({'error': 'Unexpected error'}),
         }
-    BC.add_block(f"Successfully validated and fixed picks: {picks} and tieBreaker: {tieBreaker} for week {week}")
+    BC.add_block(f"Successfully validated and fixed picks: {picks} and tieBreaker: {tieBreaker} for week {week}", action="ValidatePicks")
     return {
         'statusCode': 200,
         'body': json.dumps({'message': f'Successfully validated and fixed picks: {picks} and tieBreaker: {tieBreaker} for week {week}'}),

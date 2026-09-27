@@ -1,7 +1,8 @@
 import os
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import pytz
 import boto3
 import logging
 from boto3.dynamodb.conditions import Key
@@ -14,14 +15,22 @@ logger.setLevel(logging.INFO)
 logger.info("FBPBlockChain Lambda function initialized successfully")
 
 
-FBP_BLOCKCHAIN_TABLE_NAME = os.getenv("FBPBlockchain", "2026-FBPBlockchain")
+FBP_BLOCKCHAIN_TABLE_NAME = os.getenv("FBPBlockChain", "2026-FBPBlockchain")
 print(f"FBP_BLOCKCHAIN_TABLE_NAME: {FBP_BLOCKCHAIN_TABLE_NAME}")
 
 
 class Block:
+    ##
+    # add email as optional field
+    ##
+    
     def __init__(self, index, data, previous_hash, timestamp=None):
         self.index = index
-        self.timestamp = timestamp or datetime.now(timezone.utc).isoformat()
+        self.email = data.get("email") if isinstance(data, dict) else None
+        # self.timestamp = timestamp or datetime.now(timezone(timedelta(hours=-5))).isoformat()
+        mytimestamp=pytz.timezone("America/New_York").localize(datetime.now()).isoformat()
+        self.timestamp = mytimestamp 
+        logger.info(f"Block timestamp set to: {self.timestamp}")
         self.data = data
         self.previous_hash = previous_hash
         self.hash = self._compute_hash()
@@ -31,6 +40,7 @@ class Block:
             "index": self.index,
             "timestamp": self.timestamp,
             "data": self.data,
+            "email": self.email,
             "previous_hash": self.previous_hash,
         }, sort_keys=True)
         return hashlib.sha256(block_string.encode()).hexdigest()
@@ -65,6 +75,7 @@ class Blockchain:
             "timestamp": block.timestamp,
             "data": block.data,
             "previous_hash": block.previous_hash,
+            "email": block.email,
             "hash": block.hash,
         })
 
