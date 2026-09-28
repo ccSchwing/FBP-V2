@@ -15,7 +15,7 @@ logger.setLevel(logging.INFO)
 logger.info("FBPBlockChain Lambda function initialized successfully")
 
 
-FBP_BLOCKCHAIN_TABLE_NAME = os.getenv("FBPBlockChain", "2026-FBPBlockchain")
+FBP_BLOCKCHAIN_TABLE_NAME = os.getenv("FBPBlockChainTableName", "2026-FBPBlockChain")
 print(f"FBP_BLOCKCHAIN_TABLE_NAME: {FBP_BLOCKCHAIN_TABLE_NAME}")
 
 
