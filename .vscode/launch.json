@@ -190,6 +190,24 @@
       ]
     },
 
+  {
+      "name": "Python: Attach to BlockChainUtils",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Attach to BlockChainUtils",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/BlockchainUtils/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },
+
     {
       "name": "Python: Attach to StoreSMSVerificationCode",
       "type": "debugpy",
