@@ -24,7 +24,7 @@ class Block:
     # add email as optional field
     ##
     
-    def __init__(self, index, data, previous_hash, timestamp=None, email=None, action=None):
+    def __init__(self, index, data, previous_hash, timestamp=None, email=None, event=None, week=None):
         self.index = index
         self.email = email or (data.get("email") if isinstance(data, dict) else None)
         mytimestamp=pytz.timezone("America/New_York").localize(datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
@@ -32,7 +32,8 @@ class Block:
         logger.info(f"Block timestamp set to: {self.timestamp}")
         self.data = data
         self.previous_hash = previous_hash
-        self.action = action
+        self.event = event
+        self.week = week
         self.hash = self._compute_hash()
 
     def _compute_hash(self):
@@ -42,7 +43,6 @@ class Block:
             "data": self.data,
             "email": self.email,
             "previous_hash": self.previous_hash,
-            "action": self.action,
         }, sort_keys=True)
         return hashlib.sha256(block_string.encode()).hexdigest()
 
@@ -63,7 +63,8 @@ class Blockchain:
             self._save_block(genesis)
             return [genesis]
         return [
-            Block(int(item["index"]), item["data"], item["previous_hash"], item["timestamp"], email=item.get("email"))
+            Block(int(item["index"]), item["data"], item["previous_hash"],
+                  item["timestamp"], email=item.get("email"), event=item.get("event"), week=item.get("week"))
             for item in items
         ]
 
@@ -80,16 +81,18 @@ class Blockchain:
         }
         if block.email:
             item["email"] = block.email
-        if block.action:
-            item["action"] = block.action
+        if block.event:
+            item["event"] = block.event
+        if block.week:
+            item["week"] = block.week
         self.table.put_item(Item=item)
 
     @property
     def latest_block(self):
         return self.chain[-1]
 
-    def add_block(self, data, email=None, action=None):
-        block = Block(len(self.chain), data, self.latest_block.hash, email=email, action=action)
+    def add_block(self, data, event=None, email=None, week=None):
+        block = Block(len(self.chain), data, self.latest_block.hash, event=event, email=email, week=week)
         self._save_block(block)
         self.chain.append(block)
         return block
