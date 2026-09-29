@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FBP Admin Dashboard</title>
+    <link rel="stylesheet" type="text/css" href="/css/styles.css" />
+    <script src="/js-lib/oidc-client-ts.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.min.css">
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <link rel="icon" type="image/png" href="/icon-blue-32.png" />
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.3/js/jquery.tablesorter.min.js"></script>
+    <style>
+        /* Override header h1 positioning to not cover menu button */
+        header h1 {
+            position: static;
+            transform: none;
+            left: auto;
+        }
+
+        #logsOutput table th,
+        #logsOutput table td {
+            border: 1px solid black;
+        }
+
+        #logsOutput table {
+            width: auto;
+            border: 2px solid black;
+            padding: 5px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            background-origin: padding-box;
+            border-collapse: collapse;
+            border-color: black;
+        }
+
+        #logsOutput table th {
+            background-color: #4caf50;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .page-title {
+            position: static;
+            transform: none;
+            left: auto;
+            width: 100vw;
+            max-width: 100%;
+            text-align: center;
+            margin-top: 2rem;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+
+    <script type="module">
+        import { auth } from "/js/auth.js";
+        await auth.ensureAuthenticated();
+        const isAdmin = await auth.isAdmin();
+        if (!isAdmin) {
+            location.href = await getServiceUrl("homePage");
+        } else {
+            console.log("User is Admin");
+        }
+    </script>
+    <script type="module">
+        import { getServiceUrl } from "/js-lib/urlConfig.js";
+        async function getBlockchainAttributes() {
+            const URL_KEY = "getBlockchainAttributes";
+            const lambdaURL = await getServiceUrl(URL_KEY);
+            const response = await fetch(lambdaURL);
+            const data = await response.json();
+            console.log("Blockchain Attributes Response:", data);
+            return data;
+        }
+        window.getBlockchainAttributes = getBlockchainAttributes;
+    </script>
+    <script>
+        // Helper to populate the select with email/displayName data
+        // pass in the document elementID of the select element you want to populate
+        // There are three select elements that will use this function:
+        // 1. User email select
+        // 2. Event selection
+        // 3. Week selecton
+        // Select will be one of: email, event, week
+        // elementId will be one of "email", "event", "week"
+        function populateSelect(data, elementId) {
+            const select = document.getElementById(elementId);
+            if (select && data) {
+                select.innerHTML = "";
+                if (Array.isArray(data)) {
+
+                    for (let i = 0; i < data.length; i++) {
+                        // set a blank option at the top of the list
+                        if (i === 0) {
+                            const blankOption = document.createElement("option");
+                            blankOption.hidden = true;
+                            blankOption.value = "";
+                            blankOption.textContent = "Select a user to view/edit profile";
+                            select.appendChild(blankOption);
+                        }
+
+                        const item = data[i];
+                        const option = document.createElement("option");
+                        option.value = item.email;
+                        option.textContent = `${item.displayName} (${item.email})`;
+                        select.appendChild(option);
+                    }
+                } else {
+                    const option = document.createElement("option");
+                    option.value = data.email;
+                    option.textContent = `${data.displayName} (${data.email})`;
+                    select.appendChild(option);
+                }
+            }
+        }
+
+        // Listen for the custom event to populate the select when data is ready
+        window.addEventListener("bcAttributesLoaded", (event) => {
+            // console.log("userEmailAndDisplayNameLoaded event.detail:", event.detail);
+            for (const selectTag of ["email", "event", "week"]) {
+                populateSelect(event.detail, selectTag);
+            }
+        });
+
+        // NOt sure if I need to handle the case where the data is already present before the event listener is attached
+        // If data is already present (e.g., event fired before listener attached), populate immediately
+        // if (window.userEmailAndDisplayNameData) {
+        //     for (const selectTag of ["email", "event", "week"]) {
+        //         populateSelect(window.userEmailAndDisplayNameData, selectTag);
+        //     }
+        // }
+
+        // Call this after you have called getBlockchainAttributes
+        function displayLogsInTable(data) {
+            const logData = data;
+            if (!logData) {
+                alert("No log data available to display.");
+                return;
+            }
+
+            // Clear existing content
+            const logsOutput = document.getElementById('logsOutput');
+            logsOutput.innerHTML = '';
+
+            // Create table
+            const table = document.createElement("table");
+            table.id = "logsTable";
+            table.className = "tablesorter";
+            table.style.marginLeft = "20px";
+            const thead = document.createElement('thead');
+            const tbody = document.createElement('tbody');
+
+            // Define table headers based on log properties
+            const headers = ['timestamp', 'week', 'level', 'email', 'action', 'details'];
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // Populate table rows with log data
+            logData.forEach(log => {
+                const row = document.createElement('tr');
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.textContent = log[header] || '';
+                    row.appendChild(td);
+                });
+                if (log.level === 'ERROR') {
+                    row.style.backgroundColor = '#f8d7da'; // Light red background for error logs
+                }
+                if (log.level === 'WARNING') {
+                    row.style.backgroundColor = '#fff3cd'; // Light yellow background for warning logs
+                }
+                tbody.appendChild(row);
+            });
+            table.appendChild(tbody);
+            logsOutput.appendChild(table);
+
+            // Enable click-to-sort behavior on each column header.
+            if ($.fn.tablesorter) {
+                $("#logsTable").tablesorter();
+            }
+        }
+    </script>
+    <script type="module">
+        import { getCurrentWeek } from "/js-lib/fbpUtils.js";
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                const currentWeek = await getCurrentWeek();
+                document.getElementById("current-week").textContent = currentWeek;
+                console.log("Current week data:", currentWeek);
+            } catch (error) {
+                console.error("Error fetching current week data:", error);
+                alert("Failed to load current week data. Please try again later.");
+            }
+        });
+    </script>
+</head>
+
+<body class="fbp-admin">
+    <header>
+        <h1 style="text-align: center;">FBP BlockChain Viewer</h1>
+    </header>
+    <div class="container" style="display:flex; gap:2rem; align-items:flex-start; margin:0; max-width:100%;">
+        <script type="module">
+            import { initAdminNav } from "/js-lib/adminNav.js";
+            await initAdminNav();
+        </script>
+        <aside class="nav-choices">
+            <!-- populated by adminNav.js -->
+        </aside>
+        <main class="results-main">
+            <div class="callout">Current Week: <span id="current-week"></span></div>
+            <form id="bcForm" style="margin-left: 20px;">
+                <label for="email">Select email:</label>
+                <select id="email" name="email"></select>
+                <label for="event">Select Event:</label>
+                <select id="event" name="event"></select>
+                <label for="week">Select Week:</label>
+                <select id="week" name="week"></select><br>
+                <input type="checkbox" id="emailCheckbox" name="emailCheckbox" />
+                <label for="emailCheckbox">Email Filter</label>
+                <input type="checkbox" id="eventCheckbox" name="eventCheckbox" />
+                <label for="eventCheckbox">Event Filter</label>
+                <input type="checkbox" id="weekCheckbox" name="weekCheckbox" />
+                <label for="weekCheckbox">Week Filter</label>
+                
+                <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Submit</button>
+            </form>
+            <script>
+                document.getElementById("bcForm").addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    const data = await window.getBlockchainAttributes();
+                    console.log("Blockchain attributes data:", data);
+                    // Get each array element out of the data
+                    const emailList = data.email || [];
+                    const eventList = data.event || [];
+                    const weekList = data.week || [];
+
+                    // Populate the select elements with the retrieved data
+                    populateSelect(emailList, "email");
+                    populateSelect(eventList, "event");
+                    populateSelect(weekList, "week");
+                });
+            </script>
+        </main>
+    </div>
+    <div id="logsResult">
+        <pre id="logsOutput" style="margin-left: 20px;">No logs loaded yet. Submit the form to query logs.</pre>
+    </div>
+</body>
+
+</html>

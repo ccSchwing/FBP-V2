@@ -4,7 +4,6 @@ import boto3
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
-from twilio.rest import Client
 from typing import Dict, Any, Optional
 from enum import Enum
 from dataclasses import dataclass, asdict
@@ -91,15 +90,15 @@ def _get_all_users(channel):
     if not users_table_name:
         logger.info("FBPUSERS_TABLE_NAME not set; no users found")
         return [] 
-    if channel == "sms":
-        logger.info("Fetching all users for SMS channel")
-        try:
-            table = boto3.resource('dynamodb').Table(users_table_name)
-            items = table.scan(ProjectionExpression='email, firstName, mobile_number').get("Items", [])
-            return [u for u in items if u.get('email') and u.get('firstName') and u.get('mobile_number')]
-        except Exception as e:
-            logger.warning("DynamoDB scan failed", extra={"error": str(e)})
-            return []
+    # if channel == "sms":
+    #     logger.info("Fetching all users for SMS channel")
+    #     try:
+    #         table = boto3.resource('dynamodb').Table(users_table_name)
+    #         items = table.scan(ProjectionExpression='email, firstName, mobile_number').get("Items", [])
+    #         return [u for u in items if u.get('email') and u.get('firstName') and u.get('mobile_number')]
+    #     except Exception as e:
+    #         logger.warning("DynamoDB scan failed", extra={"error": str(e)})
+    #         return []
     if channel == "email":
         logger.info("Fetching all users for Email channel")
         try:
@@ -272,17 +271,17 @@ class EmailService:
             except Exception as e:
                 logger.warning("DynamoDB scan failed", extra={"error": str(e), "field": opt_in_field})
                 return []
-        if channel == "sms":
-            try:
-                table = boto3.resource('dynamodb').Table(users_table_name)
-                items = table.scan(
-                    ProjectionExpression=f'mobile_number, firstName, {opt_in_field}'
-                ).get("Items", [])
-                return [u for u in items if _is_opted_in(u.get(opt_in_field)) 
-                        and u.get('mobile_number') and u.get('firstName') ]
-            except Exception as e:
-                logger.warning("DynamoDB scan failed", extra={"error": str(e), "field": opt_in_field})
-                return []
+        # if channel == "sms":
+        #     try:
+        #         table = boto3.resource('dynamodb').Table(users_table_name)
+        #         items = table.scan(
+        #             ProjectionExpression=f'mobile_number, firstName, {opt_in_field}'
+        #         ).get("Items", [])
+        #         return [u for u in items if _is_opted_in(u.get(opt_in_field)) 
+        #                 and u.get('mobile_number') and u.get('firstName') ]
+        #     except Exception as e:
+        #         logger.warning("DynamoDB scan failed", extra={"error": str(e), "field": opt_in_field})
+        #         return []
         logger.info("Unsupported channel; no bulk recipients")
         return []
 
@@ -725,7 +724,7 @@ class SMSService:
 # ---------------------------------------------------------------------------
 
 email_service = EmailService()
-sms_service = SMSService()
+# sms_service = SMSService()
 
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
@@ -746,8 +745,8 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
         message_type = payload.get('message_type')
         recipient = payload.get('recipient')
 
-        if not channel or channel not in ('email', 'sms'):
-            raise ValueError("'channel' must be 'email' or 'sms'")
+        if not channel or channel not in ('email'):
+            raise ValueError("'channel' must be 'email'")
         if not message_type or not isinstance(message_type, str):
             raise ValueError("'message_type' is required")
 
@@ -760,13 +759,13 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
                 tags=payload.get('tags'),
                 channel=channel
             )
-        else:
-            result = sms_service.send(
-                message_type=message_type,
-                recipient=recipient,
-                channel=channel,
-                data=payload
-            )
+        # else:
+        #     result = sms_service.send(
+        #         message_type=message_type,
+        #         recipient=recipient,
+        #         channel=channel,
+        #         data=payload
+        #     )
 
         return asdict(result)
 

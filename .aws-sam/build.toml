@@ -108,15 +108,6 @@ manifest_hash = ""
 packagetype = "Zip"
 functions = ["AdvancedMessagingService"]
 
-[function_build_definitions.1fe82850-5c01-4284-9770-f7934525ca3b]
-codeuri = "/Users/ccs/projects/FBP/src/AdvancedSMSService/src"
-runtime = "python3.12"
-architecture = "arm64"
-handler = "AdvancedSMSService.lambda_handler"
-manifest_hash = ""
-packagetype = "Zip"
-functions = ["AdvancedSMSService"]
-
 [function_build_definitions.8a213822-2501-458a-8fbc-e3de7ed4f333]
 codeuri = "/Users/ccs/projects/FBP/src/AdvancedEmailService/src"
 runtime = "python3.12"
@@ -125,15 +116,6 @@ handler = "AdvancedEmailService.lambda_handler"
 manifest_hash = ""
 packagetype = "Zip"
 functions = ["AdvancedEmailService"]
-
-[function_build_definitions.1337ffe8-ba8a-4dce-a59d-4dde9cc6b76c]
-codeuri = "/Users/ccs/projects/FBP/src/SMSValidationUtils/src"
-runtime = "python3.12"
-architecture = "arm64"
-handler = "SMSValidationUtils.lambda_handler"
-manifest_hash = ""
-packagetype = "Zip"
-functions = ["SMSValidationUtils"]
 
 [function_build_definitions.4d39fc03-ca37-4c63-a839-260f043a0410]
 codeuri = "/Users/ccs/projects/FBP/src/GetUserStatus/src"
