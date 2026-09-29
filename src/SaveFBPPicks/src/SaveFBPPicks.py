@@ -74,7 +74,7 @@ def saveFBPPicks():
 
     week=getCurrentWeek()
     if week is None:
-        BC.add_block("Error: Could not determine current week", event="Error", email="fbpadmin@my-fbp.com")
+        BC.add_block("Error: Could not determine current week", event="Error", email="fbpadmin@my-fbp.com", week="0")
         fbpLog("fbpadmin@my-fbp.com", "SaveFBPPicksPython", "Could not determine current week", "ERROR")
         return {
             'statusCode': 500,
@@ -84,7 +84,7 @@ def saveFBPPicks():
     try:
         body = app.current_event.json_body
         if not isinstance(body, dict):
-            BC.add_block("Error: Request body must be a JSON object", event="Error", email="fbpadmin@my-fbp.com")
+            BC.add_block("Error: Request body must be a JSON object", event="Error", email="fbpadmin@my-fbp.com", week="0")
             raise ValueError("Request body must be a JSON object")
         logger.info(f"Parsed JSON body: {body}")
         email = body.get('email')
@@ -114,7 +114,7 @@ def saveFBPPicks():
             ExpressionAttributeNames={'#picks': 'picks', '#tieBreaker': 'tieBreaker', '#week': 'week', '#picksMadeBy': 'picksMadeBy'},
             ExpressionAttributeValues={':p': picks, ':t': tieBreaker, ':w': week, ':pmb': 'user'}
         )
-        BC.add_block(f"Successfully saved picks: {picks} and tieBreaker: {tieBreaker} for email: {email} and week: {week}", email=email, event="SaveFBPPicks")
+        BC.add_block(f"Successfully saved picks: {picks} and tieBreaker: {tieBreaker} for email: {email} and week: {week}", week=str(week), email=email, event="SaveFBPPicks")
         logger.info(f"Successfully saved picks: {picks} and tieBreaker: {tieBreaker} for email: {email} and week: {week}")
         fbpLog(email, "SaveFBPPicksPython", f"Successfully saved picks: {picks} and tieBreaker: {tieBreaker} for week {week}", "INFO")
     except ClientError as e:
@@ -126,7 +126,11 @@ def saveFBPPicks():
             'body': json.dumps({'error': 'DynamoDB Error'}),
         }
     except Exception as e:
-        BC.add_block(f"Unexpected error: {e}", email="fbpadmin@my-fbp.com", event="Error")
+        import traceback
+        logger.error(f"Unexpected error: {e}")
+        logger.error(traceback.format_exc())
+        
+        BC.add_block(f"Unexpected error: {e}", email=email, event="Error", week=str(week))
         logger.error(f"Unexpected error: {e}")
         fbpLog("fbpadmin@my-fbp.com", "SaveFBPPicksPython", f"Unexpected error: {e}", "ERROR")
         return {
@@ -166,7 +170,7 @@ def validateAndFixFBPPicks():
     )
     schedule = response.get('Items', [])
     if not schedule:
-        BC.add_block(f"Error: ValidateAndFixPicks - No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table for week {week}", email="fbpadmin@my-fbp.com", event="ValidateAndFixPicks")
+        BC.add_block(f"Error: ValidateAndFixPicks - No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table for week {week}", week=str(week), email="fbpadmin@my-fbp.com", event="ValidateAndFixPicks")
         logger.error(f"No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table for week {week}")
         fbpLog("fbpadmin@my-fbp.com", "method: validateAndFixFBPPicks", f"No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table for week {week}", "ERROR")
         return Response(
@@ -293,7 +297,7 @@ def validateAndFixFBPPicks():
             # Handle the case where there are no picks.
             if picks is None:
                 noPicks = True
-                BC.add_block(f"No picks found for email: {email}, setting noPicks flag to True", email=email, event="ValidateAndFixPicks")
+                BC.add_block(f"No picks found for email: {email}, setting noPicks flag to True", week=str(week), email=email, event="ValidateAndFixPicks")
                 logger.warning(f"No picks found for email: {email}, setting noPicks flag to True")
                 fbpLog(email=email, action="method: validateAndFixFBPPicks", details=f"No picks found for email: {email}, setting noPicks flag to True", level="WARNING")
             algorithm = user.get('defaultAlgorithm')
@@ -402,7 +406,7 @@ def validateAndFixFBPPicks():
                     )
                     schedule = response.get('Items', [])
                     if not schedule:
-                        BC.add_block(f"ValidateAndFixPicks - No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table for week {week},", email="fbpadmin@my-fbp.com", event="ValidateAndFixPicks")
+                        BC.add_block(f"ValidateAndFixPicks - No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table for week {week},", week=str(week), email="fbpadmin@my-fbp.com", event="ValidateAndFixPicks")
                         logger.error(f"No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table")
                         fbpLog("fbpadmin@my-fbp.com", "method: validateAndFixFBPPicks", f"No schedule items found in {FBP_SCHEDULE_TABLE_NAME} table", "ERROR")
                         return Response(
@@ -468,7 +472,7 @@ def validateAndFixFBPPicks():
                     ExpressionAttributeNames={'#picks': 'picks', '#tieBreaker': 'tieBreaker', '#week': 'week', '#displayName': 'displayName', '#picksMadeBy': 'picksMadeBy', '#userPicks': 'userPicks'},
                     ExpressionAttributeValues={':p': picks, ':t': tieBreaker, ':w': week, ':d': displayName, ':pmb': pmb, ':up': userPicks}
             )
-                BC.add_block(f"System fixed picks for email: {email}", email="fbpadmin@my-fbp.com", event="ValidateAndFixPicks")
+                BC.add_block(f"System fixed picks for email: {email}", week=str(week), email="fbpadmin@my-fbp.com", event="ValidateAndFixPicks")
             else:
                 pmb='User'
                 userPicks = ""
@@ -478,7 +482,7 @@ def validateAndFixFBPPicks():
                     ExpressionAttributeNames={'#picks': 'picks', '#tieBreaker': 'tieBreaker', '#week': 'week', '#displayName': 'displayName', '#picksMadeBy': 'picksMadeBy', '#userPicks': 'userPicks'},
                     ExpressionAttributeValues={':p': picks, ':t': tieBreaker, ':w': week, ':d': displayName, ':pmb': pmb, ':up': userPicks}
             )
-                BC.add_block(f"User updated picks for email: {email}", email=email, event="ValidateAndFixPicks")
+                BC.add_block(f"User updated picks for email: {email}", week=str(week), email=email, event="ValidateAndFixPicks")
 
             ##
             # You need to reset your relevant flags and variables here for the next user in the loop.
@@ -510,7 +514,7 @@ def validateAndFixFBPPicks():
             'statusCode': 500,
             'body': json.dumps({'error': 'Unexpected error'}),
         }
-    BC.add_block(f"Successfully validated and fixed picks: {picks} and tieBreaker: {tieBreaker} for week {week}", event="ValidatePicks", email="fbpadmin@my-fbp.com")
+    BC.add_block(f"Successfully validated and fixed picks: {picks} and tieBreaker: {tieBreaker} for week {week}", week=str(week), event="ValidatePicks", email="fbpadmin@my-fbp.com")
     return {
         'statusCode': 200,
         'body': json.dumps({'message': f'Successfully validated and fixed picks: {picks} and tieBreaker: {tieBreaker} for week {week}'}),

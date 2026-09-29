@@ -23,8 +23,8 @@ app=APIGatewayHttpResolver(cors=cors_config)
 
 # Create DynamoDB resource (reuse outside handler)
 dynamodb = boto3.resource('dynamodb')
-table=dynamodb.Table(os.environ.get('FBPBlockChainTableName', '2026-FBPBlockchain'))
-logger.info("Blockchain table initialized: %s", table.table_name)
+bcTable=dynamodb.Table(os.environ.get('FBPBlockChainTableName', '2026-FBPBlockchain'))
+logger.info("Blockchain table initialized: %s", bcTable.table_name)
 @app.post("/blockchainSearch")
 def blockchainSearch():
     """
@@ -76,7 +76,7 @@ def blockchainSearch():
         # Query by email using GSI (fast, indexed lookup)
         if email:
             try:
-                response = table.query(
+                response = bcTable.query(
                     IndexName=EMAIL_INDEX_NAME,
                     KeyConditionExpression='#pk = :pk_val',
                     ExpressionAttributeNames={'#pk': 'email'},  # Adjust if your attribute name differs
@@ -91,7 +91,7 @@ def blockchainSearch():
                 
                 # Handle pagination
                 while 'LastEvaluatedKey' in response:
-                    response = table.query(
+                    response = bcTable.query(
                         IndexName=EMAIL_INDEX_NAME,
                         KeyConditionExpression='#pk = :pk_val',
                         ExpressionAttributeNames={'#pk': 'email'},
@@ -119,7 +119,7 @@ def blockchainSearch():
         # Query by event using GSI (fast, indexed lookup)
         if event_type:
             try:
-                response = table.query(
+                response = bcTable.query(
                     IndexName=EVENT_INDEX_NAME,
                     KeyConditionExpression='#pk = :pk_val',
                     ExpressionAttributeNames={'#pk': 'event'},  # Adjust if your attribute name differs
@@ -134,7 +134,7 @@ def blockchainSearch():
                 
                 # Handle pagination
                 while 'LastEvaluatedKey' in response:
-                    response = table.query(
+                    response = bcTable.query(
                         IndexName=EVENT_INDEX_NAME,
                         KeyConditionExpression='#pk = :pk_val',
                         ExpressionAttributeNames={'#pk': 'event'},
@@ -192,43 +192,38 @@ def blockchainSearch():
             }, default=str)
         }
 
-
-# Local testing helper
-# if __name__ == '__main__':
-#     test_cases = [
-#         {
-#             'description': 'Search by email only',
-#             'event': {
-#                 'queryStringParameters': {'email': 'chuckschwing@proton.me'}
-#             }
-#         },
-#         {
-#             'description': 'Search by event only',
-#             'event': {
-#                 'queryStringParameters': {'action': 'SaveFBPPicks'}
-#             }
-#         },
-#         {
-#             'description': 'Search by both email and event',
-#             'event': {
-#                 'queryStringParameters': {
-#                     'email': 'chuckschwing@proton.me',
-#                     'action': 'SaveFBPPicks'
-#                 }
-#             }
-#         },
-#         {
-#             'description': 'Invalid - no params',
-#             'event': {'queryStringParameters': {}}
-#         }
-#     ]
+@app.get("/blockchainAttributes")
+def getBlockchainAttributes():
+    emailList = []
+    eventList = []
+    weekList = []
+    ##
+    # I need to get a distinct list of emails, events and weeks from the blockchain table
+    ##
+    dynamodb = boto3.resource('dynamodb')
+    bcTable = dynamodb.Table(os.environ.get('FBPBlockChainTableName', '2026-FBPBlockChain'))
     
-#     for test in test_cases:
-#         print(f"\n{'='*50}")
-#         print(f"Test: {test['description']}")
-#         print(f"{'='*50}")
-#         result = blockchainSearch(test['event'], None)
-#         print(json.dumps(result, indent=2))
-        
+    try:
+        response = bcTable.scan()
+        items = response.get('Items', [])
+        for item in items:
+            email = item.get('email')
+            event = item.get('event')
+            week = item.get('week')
+            if email and email not in emailList:
+                emailList.append(email)
+            if event and event not in eventList:
+                eventList.append(event)
+            if week and week not in weekList:
+                weekList.append(week)
+    except ClientError as e:
+        logger.error(f"Error scanning blockchain table: {e}")
+    return {
+        'emailList': emailList,
+        'eventList': eventList,
+        'weekList': weekList
+    }
+    
+    
 def lambda_handler(event, context):
     return app.resolve(event, context)

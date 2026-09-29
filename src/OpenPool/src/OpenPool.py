@@ -418,22 +418,22 @@ def invoke_advanced_messaging_service():
         ##
         # First, send the picksheet notification to all subscribed users via SMS.
         ##
-    message_data = {"channel": "sms", "message_type": "picksheet"}
-    sendMessageEvent = create_message_event(message_data)
+    # message_data = {"channel": "sms", "message_type": "picksheet"}
+    # sendMessageEvent = create_message_event(message_data)
 
-    response = lambda_client.invoke(
-            FunctionName=sendMessageFunction,
-            InvocationType="RequestResponse",
-            Payload=json.dumps(sendMessageEvent),
-        )
-    result = json.loads(response["Payload"].read())
-    if not result.get("success"):
-        raise RuntimeError(f"SendMessage (sms/picksheet) failed: {result.get('error')}")
+    # response = lambda_client.invoke(
+    #         FunctionName=sendMessageFunction,
+    #         InvocationType="RequestResponse",
+    #         Payload=json.dumps(sendMessageEvent),
+    #     )
+    # result = json.loads(response["Payload"].read())
+    # if not result.get("success"):
+    #     raise RuntimeError(f"SendMessage (sms/picksheet) failed: {result.get('error')}")
 
-    logging.info(f"SendMessage Response: {response}")
-    fbpLog(
-        "fbpadmin@my-fbp.com", "openPool", f"SendMessage Response: {response}", "INFO"
-        )
+    # logging.info(f"SendMessage Response: {response}")
+    # fbpLog(
+    #     "fbpadmin@my-fbp.com", "openPool", f"SendMessage Response: {response}", "INFO"
+    #     )
         ##
         # Next, send the picksheet notification to all subscribed users via Email.
         ##
@@ -456,21 +456,21 @@ def invoke_advanced_messaging_service():
         ##
         # Send out weekly winner announcement to all SMS subscribers.
         ##
-    message_data = {"channel": "sms", "message_type": "weeklywinner"}
-    sendMessageEvent = create_message_event(message_data)
-    response = lambda_client.invoke(
-            FunctionName=sendMessageFunction,
-            InvocationType="RequestResponse",
-            Payload=json.dumps(sendMessageEvent),
-    )
-    result = json.loads(response["Payload"].read())
-    if not result.get("success"):
-        raise RuntimeError(f"SendMessage (sms/weeklywinner) failed: {result.get('error')}")
+    # message_data = {"channel": "sms", "message_type": "weeklywinner"}
+    # sendMessageEvent = create_message_event(message_data)
+    # response = lambda_client.invoke(
+    #         FunctionName=sendMessageFunction,
+    #         InvocationType="RequestResponse",
+    #         Payload=json.dumps(sendMessageEvent),
+    # )
+    # result = json.loads(response["Payload"].read())
+    # if not result.get("success"):
+    #     raise RuntimeError(f"SendMessage (sms/weeklywinner) failed: {result.get('error')}")
 
-    logging.info(f"SendMessage Response: {response}")
-    fbpLog(
-        "fbpadmin@my-fbp.com", "openPool", f"SendMessage Response: {response}", "INFO"
-    )
+    # logging.info(f"SendMessage Response: {response}")
+    # fbpLog(
+    #     "fbpadmin@my-fbp.com", "openPool", f"SendMessage Response: {response}", "INFO"
+    # )
         ##
         # Send out weekly winner announcement to all Email subscribers.
         ##

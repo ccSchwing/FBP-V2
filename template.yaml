@@ -42,15 +42,9 @@ Parameters:
   FBPTeamRecordsTableName:
     Type: String
     Default: Record
-  TwilioOptOutTableName:
-    Type: String
-    Default: FBP-SMS-Opt-Outs
   FBPPayoutLedgerTableName:
     Type: String
     Default: FBP-Payout-Ledger
-  FBPSMSOptOutsTableName:
-    Type: String
-    Default: FBP-SMS-Opt-Outs
   CloudFrontDomain:
     Type: String
     Default: my-fbp.com
@@ -91,22 +85,6 @@ Parameters:
     Type: String
     Description: Support email address for the company
     Default: fbpadmin@my-fbp.com
-  # Parameters for SMS
-  TwilioPhoneNumber:
-    Type: String
-    Description: Originating Twilio phone number in E.164 format (e.g., +1234567890)
-    Default: '+16093012328'
-    AllowedPattern: ^\+[1]\d{1,11}$ # E.164 format, US numbers only
-  TwilioCredentialsSecretArn:
-    Type: String
-    Description: ARN of the Secrets Manager secret containing Twilio credentials
-    # Replace with the actual ARN of your secret. The secret should contain the Twilio Account SID and Auth Token.
-    Default: arn:aws:secretsmanager:us-east-1:768286545465:secret:TWILIO_SECRET-a6Y1ZP
-  TwilioSecret:
-    Type: String
-    Description: JSON string containing Twilio credentials (Account SID and Auth
-      Token and Twilio Phone number).
-    Default: Twilio-Secret
   KnowledgeBaseId:
     Type: String
     Description: ID of the Bedrock Knowledge Base
@@ -453,6 +431,20 @@ Resources:
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /blockchainSearch
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
+        BlockchainAttributesApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /blockchainAttributes
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        BlockchainAttributesOptionsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /blockchainAttributes
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
 
@@ -975,14 +967,6 @@ Resources:
                   - ses:SendEmail
                   - ses:SendRawEmail
                 Resource: '*'
-        - PolicyName: TwilioSMSPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - secretsmanager:GetSecretValue
-                Resource: !Ref TwilioCredentialsSecretArn
         - PolicyName: DynamoDBPolicy
           PolicyDocument:
             Version: '2012-10-17'
@@ -996,7 +980,6 @@ Resources:
                 Resource:
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Users
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-Log
-                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-Twilio-Opt-Out
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Config
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Weekly-Results
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Weekly-Results/index/${FBPWeeklyResultsWeekIndexName}
@@ -1024,7 +1007,6 @@ Resources:
       Tracing: Active
       Layers:
         - !Ref FBPLibLayer
-        # - !Ref TwilioLayer
       Events:
         AdvancedMessagingServicePost:
           Type: HttpApi
@@ -1050,8 +1032,6 @@ Resources:
           FBPLOGS_TABLE_NAME: !Sub "${Year}-Log"
           FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
           FBPWeeklyResultsWeekIndexName: !Sub "WeekIndex"
-          TWILIO_OPT_OUT_TABLE_NAME: !Sub "${Year}-Twilio-Opt-Outs"
-          TWILIO_CREDENTIALS_SECRET_ARN: !Ref TwilioCredentialsSecretArn
           POWERTOOLS_SERVICE_NAME: messaging-service
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_METRICS_NAMESPACE: MessagingService
@@ -1060,83 +1040,6 @@ Resources:
           YEAR: !Ref Year
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
 
-  AdvancedSMSServiceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: TwilioSMSPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - secretsmanager:GetSecretValue
-                Resource: !Ref TwilioCredentialsSecretArn ## Replace with actual ARN of the secret containing Twilio credentials
-        - PolicyName: XRayPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - xray:PutTraceSegments
-                  - xray:PutTelemetryRecords
-                Resource: '*'
-  AdvancedSMSService:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub ${AWS::StackName}-advanced-sms-service
-      CodeUri: src/AdvancedSMSService/src/ # Adjust path as needed
-      Handler: AdvancedSMSService.lambda_handler
-      Runtime: python3.12
-      Timeout: 30
-      MemorySize: 256
-      Role: !GetAtt AdvancedSMSServiceRole.Arn
-      Tracing: Active
-      Layers:
-        - !Ref FBPLibLayer
-        # - !Ref TwilioLayer
-      Events:
-        AdvancedSMSServicePost:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref FBPHttpApi
-            Path: /advanced-sms
-            Method: POST
-            PayloadFormatVersion: '2.0'
-        GetUserStatusOptions:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref FBPHttpApi
-            Path: /advanced-sms
-            Method: OPTIONS
-            PayloadFormatVersion: '2.0'
-      Environment:
-        Variables:
-          # Add any environment variables your new service needs
-          TWILIO_SECRET: !Ref TwilioSecret
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          COMPANY_NAME: !Ref CompanyName
-          BASE_URL: !Ref BaseUrl
-          SUPPORT_EMAIL: !Ref SupportEmail
-          FBPUSERS_TABLE_NAME: !Sub "${Year}-FBP-Users"
-          FBPLOGS_TABLE_NAME: !Sub "${Year}-Log"
-          TWILIO_OPT_OUT_TABLE_NAME: !Sub "${Year}-Twilio-Opt-Outs"
-          TWILIO_CREDENTIALS_SECRET_ARN: !Ref TwilioCredentialsSecretArn
-          # Powertools configuration
-          POWERTOOLS_SERVICE_NAME: email-service
-          POWERTOOLS_LOG_LEVEL: INFO
-          POWERTOOLS_METRICS_NAMESPACE: EmailService
-          POWERTOOLS_TRACER_CAPTURE_RESPONSE: true
-          POWERTOOLS_TRACER_CAPTURE_ERROR: true
   AdvancedEmailServiceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -1255,75 +1158,6 @@ Resources:
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-Log
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Users
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Weekly-Results
-
-  SMSValidationUtils:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/SMSValidationUtils/src/
-      Handler: SMSValidationUtils.lambda_handler
-      FunctionName: !Sub ${AWS::StackName}-sms-validation-utils-code
-      Runtime: python3.12
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Sub "${Year}-FBP-Users"
-        - DynamoDBCrudPolicy:
-            TableName: !Sub "${Year}-Log"
-        - Statement:
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Ref TwilioCredentialsSecretArn
-      Environment:
-        Variables:
-          FBPUsersTableName: !Sub "${Year}-FBP-Users"
-          FBPLogsTableName: !Sub "${Year}-Log"
-          TWILIO_CREDENTIALS_SECRET_ARN: !Ref TwilioCredentialsSecretArn
-      Layers:
-        - !Ref FBPLibLayer
-        # - !Ref TwilioLayer
-      Events:
-        StoreSMSVerificationCodePost:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref FBPHttpApi
-            Path: /storeSMSVerificationCode
-            Method: POST
-            PayloadFormatVersion: '2.0'
-        StoreSMSVerificationCodeOptions:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref FBPHttpApi
-            Path: /storeSMSVerificationCode
-            Method: OPTIONS
-            PayloadFormatVersion: '2.0'
-        GetSMSVerificationCodePost:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref FBPHttpApi
-            Path: /getSMSVerificationCode
-            Method: POST
-            PayloadFormatVersion: '2.0'
-        GetSMSVerificationCodeOptions:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref FBPHttpApi
-            Path: /getSMSVerificationCode
-            Method: OPTIONS
-            PayloadFormatVersion: '2.0'
-        UpdateSMSVerificationPost:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref FBPHttpApi
-            Path: /updateSMSVerification
-            Method: POST
-            PayloadFormatVersion: '2.0'
-        UpdateSMSVerificationOptions:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref FBPHttpApi
-            Path: /updateSMSVerification
-            Method: OPTIONS
-            PayloadFormatVersion: '2.0'
 
   GetUserStatus:
     Type: AWS::Serverless::Function
@@ -2409,44 +2243,6 @@ Outputs:
     Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/advanced-messaging
     Export:
       Name: !Sub ${AWS::StackName}-AdvancedMessagingEndpoint
-  AdvancedSMSServiceFunctionName:
-    Description: Name of the AdvancedSMSService Lambda function (retained until
-      AdvancedMessagingService is verified)
-    Value: !Ref AdvancedSMSService
-    Export:
-      Name: !Sub ${AWS::StackName}-AdvancedSMSService
-  AdvancedSMSServiceEndpoint:
-    Description: Endpoint for the AdvancedSMSService API (retained until
-      AdvancedMessagingService is verified)
-    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/advancedSMSService
-    Export:
-      Name: !Sub ${AWS::StackName}-AdvancedSMSEndpoint
-  # TwilioWebhookFunctionName:
-  #   Description: Name of the TwilioWebhook Lambda function
-  #   Value: !Ref TwilioWebHook
-  #   Export:
-  #     Name: !Sub "${AWS::StackName}-twilio-webhook"
-  #    Name: !Sub ${AWS::StackName}-twilio-webhook-endpoint
-  SMSVerificationFunctionName:
-    Description: Name of the SMSValidationUtils Lambda function
-    Value: !Ref SMSValidationUtils
-    Export:
-      Name: !Sub ${AWS::StackName}-SMSVerificationCodeFunctionName
-  SMSStoreVerificationCodeEndpoint:
-    Description: Endpoint for sending SMS verification codes
-    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/storeSMSVerificationCode
-    Export:
-      Name: !Sub ${AWS::StackName}-SMSStoreVerificationCodeEndpoint
-  SMSGetVerificationCodeEndpoint:
-    Description: Endpoint for sending SMS verification codes
-    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getSMSVerificationCode
-    Export:
-      Name: !Sub ${AWS::StackName}-SMSGetVerificationCodeEndpoint
-  SMSUpdateVerificationCodeEndpoint:
-    Description: Endpoint for updating SMS verification status
-    Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/updateSMSVerification
-    Export:
-      Name: !Sub ${AWS::StackName}-SMSUpdateVerificationCodeEndpoint
   GetTeamRecordsEndpoint:
     Description: Endpoint for the GetTeamRecords API
     Value: !Sub https://${FBPHttpApi}.execute-api.${AWS::Region}.amazonaws.com/getTeamRecords
