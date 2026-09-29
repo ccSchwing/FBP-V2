@@ -455,6 +455,20 @@ Resources:
             Path: /blockchainSearch
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
+        BlockchainAttributesApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /blockchainAttributes
+            Method: GET
+            PayloadFormatVersion: '2.0'
+        BlockchainAttributesOptionsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FBPHttpApi
+            Path: /blockchainAttributes
+            Method: OPTIONS
+            PayloadFormatVersion: '2.0'
 
   ChatBot:
     Type: AWS::Serverless::Function

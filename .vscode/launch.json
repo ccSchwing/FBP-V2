@@ -191,14 +191,51 @@
     },
 
   {
-      "name": "Python: Attach to BlockChainUtils",
+      "name": "Python: Attach to BlockChainUtils (blockchainSearch)",
       "type": "debugpy",
       "request": "attach",
       "connect": {
         "host": "localhost",
         "port": 5678
       },
-      "preLaunchTask": "Attach to BlockChainUtils",
+      "preLaunchTask": "Attach to BlockChainUtils (blockchainSearch)",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/BlockchainUtils/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },
+
+
+  {
+      "name": "Python: Attach to BlockChainUtils (blockchainSearch)",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Attach to BlockChainUtils (blockchainSearch)",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/BlockchainUtils/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },    
+
+    {
+      "name": "Python: Attach to BlockChainUtils (blockchainAttributes)",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Attach to BlockChainUtils (blockchainAttributes)",
       "postDebugTask": "Cleanup",
       "pathMappings": [
         {
