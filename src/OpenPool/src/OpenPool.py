@@ -119,6 +119,7 @@ def openPool():
         invoke_import_spreads_and_final_scores()
         invoke_calc_weekly_results()
         invoke_update_weekly_results()
+        invoke_update_total_correct_and_incorrect_picks()
         invoke_advanced_messaging_service()
         import_spreads_and_final_scores_for_new_week()
         set_pool_open()
@@ -385,6 +386,82 @@ def invoke_update_weekly_results():
     except (ClientError, Exception) as e:
         raise RuntimeError(f"Error invoking UpdateWeeklyResults Lambda: {e}")
 
+
+##
+# this calls a method from UpdateWeeklyResults
+##
+@app.get("/OPupdateTotalCorrectAndIncorrectPicks")
+def invoke_update_total_correct_and_incorrect_picks():
+    powertools_event = {
+        "version": "2.0",
+        "routeKey": "GET /updateTotalCorrectAndIncorrectPicks",
+        "rawPath": "/updateTotalCorrectAndIncorrectPicks",
+        "rawQueryString": "",
+        "headers": {
+            "content-type": "application/json"
+        },
+        "requestContext": {
+            "routeKey": "GET /updateTotalCorrectAndIncorrectPicks",
+            "stage": "$default",
+            "requestId": "local-request-id",
+            "apiId": "local",
+            "http": {
+                "method": "GET",
+                "path": "/updateTotalCorrectAndIncorrectPicks",
+                "protocol": "HTTP/1.1",
+                "sourceIp": "127.0.0.1",
+                "userAgent": "sam-local"
+            }
+        },
+        "isBase64Encoded": False
+    }
+
+    updateTotalCorrectAndIncorrectPicksFunction = os.environ.get("UpdateWeeklyResults", "UpdateWeeklyResults")
+    logging.info(
+        f"Invoking UpdateWeeklyResults Lambda function: {updateTotalCorrectAndIncorrectPicksFunction}"
+    )
+    fbpLog(
+        "fbpadmin@my-fbp.com",
+        "OpenPool",
+        f"Invoking UpdateWeeklyResults Lambda function: {updateTotalCorrectAndIncorrectPicksFunction}",
+        "INFO",
+    )
+
+    try:
+        response = lambda_client.invoke(
+            FunctionName=updateTotalCorrectAndIncorrectPicksFunction,
+            InvocationType="RequestResponse",
+            Payload=json.dumps(powertools_event),
+        )
+        logging.info(f"UpdateWeeklyResults Response: {response}")
+        result = json.loads(response["Payload"].read())
+        logging.info(f"UpdateWeeklyResults Result: {result}")
+        if result.get("statusCode") == 200:
+            body = result.get("body")
+            logging.info(f"UpdateWeeklyResults Body: {body}")
+            if isinstance(body, str):
+                body = json.loads(body)
+                logging.info(f"UpdateWeeklyResults Body: {body}")
+                logging.info("UpdateWeeklyResults succeeded, proceeding to next steps.")
+                # Here you would add the logic to invoke the next Lambda functions for emailing users, updating pool status, etc.
+        else:
+            logging.error(
+                f"UpdateWeeklyResults failed with status code: {result.get('statusCode')}"
+            )
+            fbpLog(
+                "fbpadmin@my-fbp.com",
+                "OpenPool",
+                f"UpdateWeeklyResults failed with status code: {result.get('statusCode')}",
+                "ERROR",
+            )
+            raise RuntimeError(f"UpdateWeeklyResults failed with status code: {result.get('statusCode')}")
+    except (ClientError, Exception) as e:
+        raise RuntimeError(f"Error invoking UpdateWeeklyResults Lambda: {e}")
+
+    
+    
+    
+    
     ## Call AdvancedMessagingService Lambda to send out the picksheet notification to
     # subscribed users.
 def invoke_advanced_messaging_service():

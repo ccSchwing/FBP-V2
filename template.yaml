@@ -437,14 +437,14 @@ Resources:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
-            Path: /blockchainAttributes
+            Path: /getBlockchainAttributes
             Method: GET
             PayloadFormatVersion: '2.0'
         BlockchainAttributesOptionsApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
-            Path: /blockchainAttributes
+            Path: /getBlockchainAttributes
             Method: OPTIONS
             PayloadFormatVersion: '2.0'
 
@@ -822,7 +822,17 @@ Resources:
             TableName: !Sub "${Year}-FBP-Weekly-Results"
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-Schedule"
-
+      Events:
+        UpdateTotalCorrectAndIncorrectPicks:
+          Type: Api
+          Properties:
+            Path: /OPupdateTotalCorrectAndIncorrectPicks
+            Method: get
+        UpdateTotalCorrectAndIncorrectPicksOptions:
+          Type: Api
+          Properties:
+            Path: /OPupdateTotalCorrectAndIncorrectPicks
+            Method: options
   ClosePool:
     Type: AWS::Serverless::Function
     Properties:

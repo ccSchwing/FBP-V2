@@ -58,10 +58,11 @@
 
     <script type="module">
         import { auth } from "/js/auth.js";
+        import { getServiceUrl } from "/js-lib/urlConfig.js";
         await auth.ensureAuthenticated();
         const isAdmin = await auth.isAdmin();
         if (!isAdmin) {
-            location.href = await getServiceUrl("homePage");
+            location.href = "https://my-fbp.com/fbp-home.html";
         } else {
             console.log("User is Admin");
         }
@@ -77,6 +78,12 @@
             return data;
         }
         window.getBlockchainAttributes = getBlockchainAttributes;
+        document.addEventListener("DOMContentLoaded", async () => {
+            const data = await getBlockchainAttributes();
+            populateSelect(data.emailList || [], "email");
+            populateSelect(data.eventList || [], "event");
+            populateSelect(data.weekList || [], "week");
+        });
     </script>
     <script>
         // Helper to populate the select with email/displayName data
@@ -99,14 +106,21 @@
                             const blankOption = document.createElement("option");
                             blankOption.hidden = true;
                             blankOption.value = "";
-                            blankOption.textContent = "Select a user to view/edit profile";
+                            if (elementId == "email") {
+                                blankOption.textContent = "Select an email";
+                            } else if (elementId == "event") {
+                                blankOption.textContent = "Select an event";
+                            } else if (elementId == "week") {
+                                blankOption.textContent = "Select a week";
+                            }
                             select.appendChild(blankOption);
                         }
 
                         const item = data[i];
                         const option = document.createElement("option");
-                        option.value = item.email;
-                        option.textContent = `${item.displayName} (${item.email})`;
+                        option.hidden = false;
+                        option.value = item;
+                        option.textContent = option.value;
                         select.appendChild(option);
                     }
                 } else {
@@ -120,7 +134,7 @@
 
         // Listen for the custom event to populate the select when data is ready
         window.addEventListener("bcAttributesLoaded", (event) => {
-            // console.log("userEmailAndDisplayNameLoaded event.detail:", event.detail);
+            console.log("userEmailAndDisplayNameLoaded event.detail:", event.detail);
             for (const selectTag of ["email", "event", "week"]) {
                 populateSelect(event.detail, selectTag);
             }
@@ -134,60 +148,45 @@
         //     }
         // }
 
-        // Call this after you have called getBlockchainAttributes
-        function displayLogsInTable(data) {
-            const logData = data;
-            if (!logData) {
-                alert("No log data available to display.");
+        function displayBlockchainTable(results) {
+            const logsOutput = document.getElementById('logsOutput');
+            const existingTable = logsOutput.querySelector('#logsTable');
+            if (existingTable && $.fn.tablesorter) {
+                $(existingTable).trigger('destroy');
+            }
+            logsOutput.replaceChildren();
+            if (!results.length) {
+                logsOutput.textContent = 'No results found.';
                 return;
             }
-
-            // Clear existing content
-            const logsOutput = document.getElementById('logsOutput');
-            logsOutput.innerHTML = '';
-
-            // Create table
-            const table = document.createElement("table");
-            table.id = "logsTable";
-            table.className = "tablesorter";
-            table.style.marginLeft = "20px";
+            const headers = ['index', 'timestamp', 'email', 'event', 'week', 'data'];
+            const table = document.createElement('table');
+            table.id = 'logsTable';
+            table.className = 'tablesorter';
+            table.style.marginLeft = '20px';
             const thead = document.createElement('thead');
-            const tbody = document.createElement('tbody');
-
-            // Define table headers based on log properties
-            const headers = ['timestamp', 'week', 'level', 'email', 'action', 'details'];
             const headerRow = document.createElement('tr');
-            headers.forEach(header => {
+            headers.forEach(h => {
                 const th = document.createElement('th');
-                th.textContent = header;
+                th.textContent = h;
                 headerRow.appendChild(th);
             });
             thead.appendChild(headerRow);
             table.appendChild(thead);
-
-            // Populate table rows with log data
-            logData.forEach(log => {
+            const tbody = document.createElement('tbody');
+            results.forEach(item => {
                 const row = document.createElement('tr');
-                headers.forEach(header => {
+                headers.forEach(h => {
                     const td = document.createElement('td');
-                    td.textContent = log[header] || '';
+                    const val = item[h];
+                    td.textContent = typeof val === 'object' ? JSON.stringify(val) : (val || '');
                     row.appendChild(td);
                 });
-                if (log.level === 'ERROR') {
-                    row.style.backgroundColor = '#f8d7da'; // Light red background for error logs
-                }
-                if (log.level === 'WARNING') {
-                    row.style.backgroundColor = '#fff3cd'; // Light yellow background for warning logs
-                }
                 tbody.appendChild(row);
             });
             table.appendChild(tbody);
             logsOutput.appendChild(table);
-
-            // Enable click-to-sort behavior on each column header.
-            if ($.fn.tablesorter) {
-                $("#logsTable").tablesorter();
-            }
+            if ($.fn.tablesorter) $("#logsTable").tablesorter();
         }
     </script>
     <script type="module">
@@ -227,29 +226,35 @@
                 <select id="event" name="event"></select>
                 <label for="week">Select Week:</label>
                 <select id="week" name="week"></select><br>
-                <input type="checkbox" id="emailCheckbox" name="emailCheckbox" />
+                <!-- <input type="checkbox" id="emailCheckbox" name="emailCheckbox" />
                 <label for="emailCheckbox">Email Filter</label>
                 <input type="checkbox" id="eventCheckbox" name="eventCheckbox" />
                 <label for="eventCheckbox">Event Filter</label>
                 <input type="checkbox" id="weekCheckbox" name="weekCheckbox" />
                 <label for="weekCheckbox">Week Filter</label>
-                
+                 -->
                 <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Submit</button>
             </form>
-            <script>
+            <script type="module">
+                import { getServiceUrl } from "/js-lib/urlConfig.js";
                 document.getElementById("bcForm").addEventListener("submit", async (e) => {
                     e.preventDefault();
-                    const data = await window.getBlockchainAttributes();
-                    console.log("Blockchain attributes data:", data);
-                    // Get each array element out of the data
-                    const emailList = data.email || [];
-                    const eventList = data.event || [];
-                    const weekList = data.week || [];
-
-                    // Populate the select elements with the retrieved data
-                    populateSelect(emailList, "email");
-                    populateSelect(eventList, "event");
-                    populateSelect(weekList, "week");
+                    const email = document.getElementById("email").value;
+                    const event = document.getElementById("event").value;
+                    const week = document.getElementById("week").value;
+                    if (!email && !event && !week) {
+                        alert("Please select at least one filter.");
+                        return;
+                    }
+                    const lambdaURL = await getServiceUrl("blockchainSearch");
+                    const response = await fetch(lambdaURL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email, event, week })
+                    });
+                    const data = await response.json();
+                    console.log("Blockchain search results:", data);
+                    displayBlockchainTable(data.results || []);
                 });
             </script>
         </main>
