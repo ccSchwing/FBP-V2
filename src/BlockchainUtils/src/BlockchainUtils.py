@@ -53,146 +53,79 @@ def blockchainSearch():
         # this should be action, not event.
         ##
         event_type = query_params.get('event') or body_params.get('event')
+        week = query_params.get('week') or body_params.get('week')
         
         # Validate at least one search parameter
-        if not email and not event_type:
-            return {
-                'statusCode': 400,
-                'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps({
+        if not email and not event_type and not week:
+            return Response(
+                status_code=400,
+                content_type="application/json",
+                body=json.dumps({
                     'error': 'At least one search parameter (email or event) is required',
                     'usage': 'Provide "email" and/or "event" in queryStringParameters or body'
                 })
-            }
+            )
         
-        results = []
-        source_count = {}
-        
-        # Update these GSI names to match your actual index names
         EMAIL_INDEX_NAME = os.environ.get('FBPBlockChainEmailIndexName', 'email-index')
         EVENT_INDEX_NAME = os.environ.get('FBPBlockChainEventIndexName', 'event-index')
         WEEK_INDEX_NAME = os.environ.get('FBPBlockChainWeekIndexName', 'week-index')
-        
-        # Query by email using GSI (fast, indexed lookup)
-        if email:
+
+        def query_gsi(index_name, attr_name, attr_value):
+            items = []
+            kwargs = {
+                'IndexName': index_name,
+                'KeyConditionExpression': '#pk = :pk_val',
+                'ExpressionAttributeNames': {'#pk': attr_name},
+                'ExpressionAttributeValues': {':pk_val': attr_value}
+            }
             try:
-                response = bcTable.query(
-                    IndexName=EMAIL_INDEX_NAME,
-                    KeyConditionExpression='#pk = :pk_val',
-                    ExpressionAttributeNames={'#pk': 'email'},  # Adjust if your attribute name differs
-                    ExpressionAttributeValues={
-                        ':pk_val': email
-                    }
-                )
-                
-                items = response.get('Items', [])
-                results.extend(items)
-                source_count['email_query'] = len(items)
-                
-                # Handle pagination
+                response = bcTable.query(**kwargs)
+                items.extend(response.get('Items', []))
                 while 'LastEvaluatedKey' in response:
-                    response = bcTable.query(
-                        IndexName=EMAIL_INDEX_NAME,
-                        KeyConditionExpression='#pk = :pk_val',
-                        ExpressionAttributeNames={'#pk': 'email'},
-                        ExpressionAttributeValues={
-                            ':pk_val': email
-                        },
-                        ExclusiveStartKey=response['LastEvaluatedKey']
-                    )
-                    items = response.get('Items', [])
-                    results.extend(items)
-                    source_count['email_query'] += len(items)
-                    
+                    response = bcTable.query(**kwargs, ExclusiveStartKey=response['LastEvaluatedKey'])
+                    items.extend(response.get('Items', []))
             except ClientError as e:
                 error_code = e.response.get('Error', {}).get('Code', 'Unknown')
                 if error_code == 'ResourceNotFoundException':
-                    return {
-                        'statusCode': 500,
-                        'headers': {'Content-Type': 'application/json'},
-                        'body': json.dumps({
-                            'error': f'GSI "{EMAIL_INDEX_NAME}" not found. Check your index name.'
-                        })
-                    }
+                    raise ValueError(f'GSI "{index_name}" not found. Check your index name.')
                 raise
-        
-        # Query by event using GSI (fast, indexed lookup)
-        if event_type:
-            try:
-                response = bcTable.query(
-                    IndexName=EVENT_INDEX_NAME,
-                    KeyConditionExpression='#pk = :pk_val',
-                    ExpressionAttributeNames={'#pk': 'event'},  # Adjust if your attribute name differs
-                    ExpressionAttributeValues={
-                        ':pk_val': event_type
-                    }
-                )
-                
-                items = response.get('Items', [])
-                results.extend(items)
-                source_count['event_query'] = len(items)
-                
-                # Handle pagination
-                while 'LastEvaluatedKey' in response:
-                    response = bcTable.query(
-                        IndexName=EVENT_INDEX_NAME,
-                        KeyConditionExpression='#pk = :pk_val',
-                        ExpressionAttributeNames={'#pk': 'event'},
-                        ExpressionAttributeValues={
-                            ':pk_val': event_type
-                        },
-                        ExclusiveStartKey=response['LastEvaluatedKey']
-                    )
-                    items = response.get('Items', [])
-                    results.extend(items)
-                    source_count['event_query'] += len(items)
-                    
-            except ClientError as e:
-                error_code = e.response.get('Error', {}).get('Code', 'Unknown')
-                if error_code == 'ResourceNotFoundException':
-                    return {
-                        'statusCode': 500,
-                        'headers': {'Content-Type': 'application/json'},
-                        'body': json.dumps({
-                            'error': f'GSI "{EVENT_INDEX_NAME}" not found. Check your index name.'
-                        })
-                    }
-                raise
-        
-        # Deduplicate if both queries returned overlapping records
-        seen_ids = set()
-        deduplicated_results = []
-        for item in results:
-            # Assuming blockchain has a unique identifier (adjust if your PK differs)
-            record_id = item.get('pk') or item.get('id') or str(item)
-            if record_id not in seen_ids:
-                seen_ids.add(record_id)
-                deduplicated_results.append(item)
-        
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-store'  # Blockchain data shouldn't be cached
-            },
-            'body': json.dumps({
-                'count': len(deduplicated_results),
-                'queries_run': source_count,
-                'results': deduplicated_results
-            }, default=str)  # Handle datetime/decimal serialization
-        }
+            return items
+
+        # Query the first provided param, then intersect with subsequent ones
+        filters = []
+        if email:      filters.append(('email',  EMAIL_INDEX_NAME, 'email',  email))
+        if event_type: filters.append(('event',  EVENT_INDEX_NAME, 'event',  event_type))
+        if week:       filters.append(('week',   WEEK_INDEX_NAME,  'week',   week))
+
+        # Start with results from the first GSI
+        _, first_index, first_attr, first_val = filters[0]
+        result_items = query_gsi(first_index, first_attr, first_val)
+
+        # AND: keep only items that also match every remaining filter
+        for _, _, attr, val in filters[1:]:
+            result_items = [item for item in result_items if item.get(attr) == val]
+
+        return Response(
+            status_code=200,
+            content_type="application/json",
+            headers={'Cache-Control': 'no-store'},
+            body=json.dumps({
+                'count': len(result_items),
+                'results': result_items
+            }, default=str)
+        )
         
     except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({
+        return Response(
+            status_code=500,
+            content_type="application/json",
+            body=json.dumps({
                 'error': f'Internal error: {str(e)}',
                 'traceback': os.getenv('LAMBDA_DEBUG', '').lower() == 'true' and str(type(e).__name__) or None
             }, default=str)
-        }
+        )
 
-@app.get("/blockchainAttributes")
+@app.get("/getBlockchainAttributes")
 def getBlockchainAttributes():
     emailList = []
     eventList = []

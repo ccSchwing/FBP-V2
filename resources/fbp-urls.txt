@@ -39,3 +39,4 @@ getCurrentWeek:https://my-fbp.com/prod/getCurrentWeek
 htmlToPdf:https://my-fbp.com/prod/htmlToPdf
 advancedMessagingService:https://my-fbp.com/prod/advanced-messaging
 getBlockchainAttributes:https://my-fbp.com/prod/getBlockchainAttributes
+blockchainSearch:https://my-fbp.com/prod/blockchainSearch
