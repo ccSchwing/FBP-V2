@@ -1,7 +1,7 @@
 import os
 import hashlib
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 import pytz
 import boto3
 import logging
@@ -27,8 +27,9 @@ class Block:
     def __init__(self, index, data, previous_hash, timestamp=None, email=None, event=None, week=None):
         self.index = index
         self.email = email or (data.get("email") if isinstance(data, dict) else None)
-        mytimestamp=pytz.timezone("America/New_York").localize(datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
-        self.timestamp = timestamp or mytimestamp 
+        mytimestamp = datetime.now(pytz.utc).astimezone(pytz.timezone("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
+        # self.timestamp = timestamp or mytimestamp 
+        self.timestamp = mytimestamp
         logger.info(f"Block timestamp set to: {self.timestamp}")
         self.data = data
         self.previous_hash = previous_hash
