@@ -16,7 +16,7 @@ from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from fbplib.decimalDefault import decimal_default
 from fbplib.fbpLog import fbpLog
 from fbplib.getCurrentWeek import getCurrentWeek
-from fbpblockchain.blockchain import Blockchain as BC
+from fbpblockchain.blockchain import Blockchain as BlockchainClass
 
 
 # Helper function to convert Decimal objects to int or float when serializing to JSON.
@@ -57,7 +57,7 @@ def isValidPickString(s: str) -> bool:
     return bool(pattern.match(s))
 
 
-BC=BC()
+BC=BlockchainClass()
 
 
 @app.post("/saveFBPPicks")
@@ -74,7 +74,7 @@ def saveFBPPicks():
 
     week=getCurrentWeek()
     if week is None:
-        BC.add_block("Error: Could not determine current week", event="Error", email="fbpadmin@my-fbp.com", week="0")
+        BC.add_block(data="Error: Could not determine current week", event="Error", email="fbpadmin@my-fbp.com", week="0")
         fbpLog("fbpadmin@my-fbp.com", "SaveFBPPicksPython", "Could not determine current week", "ERROR")
         return {
             'statusCode': 500,
@@ -142,7 +142,7 @@ def saveFBPPicks():
         'body': json.dumps({'message': f'Successfully saved picks: {picks} and tieBreaker: {tieBreaker} for week {week}'}),
     }
 
-@app.post("ValidateAndFixPicks")
+@app.post("/validateAndFixFBPPicks")
 def validateAndFixFBPPicks():
     fbpLog("fbpadmin@my-fbp.com", "SaveFBPPicksPython", "Validating and fixing FBP picks", "INFO")
     FBP_USERS_TABLE_NAME = os.environ.get('FBPUsersTableName', 'FBP-Users')
