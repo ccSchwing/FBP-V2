@@ -755,6 +755,8 @@ Resources:
             TableName: !Sub "${Year}-Log"
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-Schedule"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBPBlockChain"
         - Version: '2012-10-17'
           Statement:
             - Effect: Allow
@@ -784,6 +786,7 @@ Resources:
       MemorySize: 512
       Layers:
         - !Ref FBPLibLayer
+        - !Ref FBPBlockChainLayer
       Environment:
         Variables:
           Year: !Ref Year
@@ -800,6 +803,7 @@ Resources:
           SendEmail: !Ref SendEmail
           FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
           HTMLtoPDF: !Ref HTMLtoPDF # Generate picksheet PDF.
+          FBPBlockChainTableName: !Sub "${Year}-FBPBlockChain"
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -822,6 +826,8 @@ Resources:
             TableName: !Sub "${Year}-FBP-Weekly-Results"
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-Schedule"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBPBlockChain"
       Events:
         UpdateTotalCorrectAndIncorrectPicks:
           Type: Api
@@ -833,6 +839,16 @@ Resources:
           Properties:
             Path: /OPupdateTotalCorrectAndIncorrectPicks
             Method: options
+        GeneratePicksheetPdf:
+          Type: Api
+          Properties:
+            Path: /generatePicksheetPdf
+            Method: get
+        GeneratePicksheetPdfOptions:
+          Type: Api
+          Properties:
+            Path: /generatePicksheetPdf
+            Method: options
   ClosePool:
     Type: AWS::Serverless::Function
     Properties:
@@ -842,6 +858,7 @@ Resources:
       Runtime: python3.12
       Layers:
         - !Ref FBPLibLayer
+        - !Ref FBPBlockChainLayer
       Environment:
         Variables:
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
@@ -882,6 +899,8 @@ Resources:
             TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-FBP-Users"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBPBlockChain"
       Events:
         ClosePoolGET:
           Type: HttpApi

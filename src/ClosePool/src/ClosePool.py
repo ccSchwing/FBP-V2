@@ -12,7 +12,7 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig, ProxyEventType
 from fbplib.fbpLog import fbpLog
 from fbplib.getCurrentWeek import getCurrentWeek
-
+from fbpblockchain.blockchain import Blockchain as Blockchain
 
 
 logging.basicConfig(format="%(levelname)s %(message)s")
@@ -23,6 +23,7 @@ logger.info(
     "ClosePool Lambda function initialized successfully"
 )  # Log successful initialization
 
+BC = Blockchain()
 
 USERS_TABLE_NAME = os.environ.get("FBPUsersTableName", "FBP-Users")
 logger.info(f"Using DynamoDB table: {USERS_TABLE_NAME}")
@@ -46,11 +47,10 @@ cors_config = CORSConfig(
     allow_credentials=False,
 )
 app = APIGatewayHttpResolver(proxy_type=ProxyEventType.APIGatewayProxyEventV2, cors=cors_config)
-# app = APIGatewayHttpResolver(cors=cors_config)
 
 ##
-# Close to Pool
-##
+# This method is only used for debugging
+## 
 @app.post("/generateGridsheetPdf")
 def generateGridsheetPdf():
     body = app.current_event.json_body or {}
@@ -63,6 +63,10 @@ def generateGridsheetPdf():
 def closePool():
     logging.info("Handling closePool request")
     fbpLog("fbpadmin@my-fbp.com", "ClosePool", "Handling closePool request", "INFO")
+    week = getCurrentWeek()
+    if week is None:
+        raise RuntimeError("Could not determine current week")
+    BC.add_block(data = "close_pool_request_received", week=week, email="fbpadmin@my-fbp.com", event="closePool")
     try:
         _close_pool_steps()
     except RuntimeError as e:
@@ -74,6 +78,7 @@ def _close_pool_steps():
     FBPConfigTableName = os.environ.get("FBPConfigTableName", "FBP-Config")
     configTable = boto3.resource("dynamodb").Table(FBPConfigTableName)
     current_week = getCurrentWeek()
+    week = current_week
     try:
         response = configTable.get_item(Key={"Week": current_week})
         if "Item" in response:
@@ -88,6 +93,7 @@ def _close_pool_steps():
                     f"Pool is already closed for week {current_week}. Cannot proceed with closing the pool for the current week.",
                     "ERROR",
                 )
+                BC.add_block(data = f"pool_already_closed_for_week_{current_week}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
                 raise RuntimeError(f"Pool is already closed for week {current_week}. Cannot proceed with closing the pool for the current week.")
             else:
                 logging.info(
@@ -112,6 +118,7 @@ def _close_pool_steps():
                 f"Configuration for current week {current_week} not found.",
                 "ERROR",
             )
+            BC.add_block(data = f"configuration_not_found_for_week_{current_week}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
             raise RuntimeError(f"Configuration for current week {current_week} not found.")
 
     except ClientError as e:
@@ -122,20 +129,8 @@ def _close_pool_steps():
             f"Error checking pool status for week {current_week}: {e}",
             "ERROR",
         )
+        BC.add_block(data = f"error_checking_pool_status_for_week_{current_week}: {e}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
         raise RuntimeError(f"Error checking pool status for week {current_week}: {e}")
-    ##
-    # Call generateGridsheet Lambda function to generate the gridsheet for the current week.
-    try:
-        generate_gridsheet_pdf(current_week)
-    except Exception as e:
-        logging.exception(f"Error generating gridsheet for week {current_week}: {e}")
-        fbpLog(
-            "fbpadmin@my-fbp.com",
-            "ClosePool",
-            f"Error generating gridsheet for week {current_week}: {e}",
-            "ERROR",
-        )
-        raise RuntimeError(f"Error generating gridsheet for week {current_week}: {e}")
     # Defind the lambda client
     lambda_client = boto3.client("lambda")
 
@@ -166,13 +161,9 @@ def _close_pool_steps():
         "isBase64Encoded": False,
     }
 
-    ##
-    # Call the validateAndFixFBPPicks Lambda function to validate user
-    # picks and fix any missing picks using the user's default algorithm.
-    # Get the Lambda function name from environment variable or use a default value
     saveFBPPicksFunction = os.environ.get("SaveFBPPicks", "SaveFBPPicks")
     logging.info(
-        f"Invoking SaveFBPPicks Lambda function: {saveFBPPicksFunction} with event: {powertools_event}"
+        f"Invoking validateAndFixFBPPicks Lambda function: {saveFBPPicksFunction} with event: {powertools_event}"
     )
     try:
         response = lambda_client.invoke(
@@ -180,21 +171,38 @@ def _close_pool_steps():
             InvocationType="RequestResponse",
             Payload=json.dumps(powertools_event),
         )
-        logging.info(f"SaveFBPPicks Response: {response}")
+        logging.info(f"validateAndFixFBPPicks Response: {response}")
         result = json.loads(response["Payload"].read())
-        logging.info(f"SaveFBPPicks Result: {result}")
+        logging.info(f"validateAndFixFBPPicks Result: {result}")
         if result.get("statusCode") == 200:
             body = result.get("body")
-            logging.info(f"SaveFBPPicks Body: {body}")
+            logging.info(f"validateAndFixFBPPicks Body: {body}")
             if isinstance(body, str):
                 body = json.loads(body)
             if result.get("statusCode") == 200:
-                logging.info(f"SaveFBPPicks Body: {body}")
-                logging.info("SaveFBPPicks succeeded, proceeding to next steps.")
+                logging.info(f"validateAndFixFBPPicks Body: {body}")
+                logging.info("validateAndFixFBPPicks succeeded, proceeding to next steps.")
         else:
-            raise RuntimeError(f"SaveFBPPicks failed with status code: {result.get('statusCode')}")
+            BC.add_block(data = f"validateAndFixFBPPicks failed with status code: {result.get('statusCode')}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
+            raise RuntimeError(f"validateAndFixFBPPicks failed with status code: {result.get('statusCode')}")
     except (ClientError, Exception) as e:
-        raise RuntimeError(f"Error invoking SaveFBPPicks Lambda: {e}")
+        BC.add_block(data = f"Error invoking validateAndFixFBPPicks Lambda: {e}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
+        raise RuntimeError(f"Error invoking validateAndFixFBPPicks Lambda: {e}")
+
+    ##
+    # Call generateGridsheet Lambda function to generate the gridsheet for the current week.
+    try:
+        generate_gridsheet_pdf(current_week)
+    except Exception as e:
+        logging.exception(f"Error generating gridsheet for week {current_week}: {e}")
+        fbpLog(
+            "fbpadmin@my-fbp.com",
+            "ClosePool",
+            f"Error generating gridsheet for week {current_week}: {e}",
+            "ERROR",
+        )
+        BC.add_block(data = f"error_generating_gridsheet_for_week_{current_week}: {e}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
+        raise RuntimeError(f"Error generating gridsheet for week {current_week}: {e}")
 
     ##
     # Send gridsheet via AdvancedMessagingService for each channel.
@@ -228,8 +236,10 @@ def _close_pool_steps():
         result = json.loads(response["Payload"].read())
         logging.info(f"AdvancedMessagingService [{channel}] Result: {result}")
         if not result.get("success"):
+            BC.add_block(data = f"AdvancedMessagingService [{channel}] failed with error: {result.get('error')}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
             raise RuntimeError(f"AdvancedMessagingService [{channel}] failed with error: {result.get('error')}")
-
+        else:
+            BC.add_block(data = f"AdvancedMessagingService [{channel}] succeeded with result: {result}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
     # Get the Lambda function name from environment variable or use a default value
     setPoolStatusClosed = os.environ.get("SetPoolStatusClosed", "SetPoolStatusClosed")
     powertools_event = {
@@ -274,16 +284,21 @@ def _close_pool_steps():
             if result.get("statusCode") == 200:
                 logging.info(f"SetPoolStatusClosed Body: {body}")
                 logging.info("SetPoolStatusClosed succeeded, proceeding to next steps.")
+                BC.add_block(data = f"SetPoolStatusClosed succeeded with body: {body}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
         else:
+            BC.add_block(data = f"SetPoolStatusClosed failed with status code: {result.get('statusCode')}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
             raise RuntimeError(f"SetPoolStatusClosed failed with status code: {result.get('statusCode')}")
     except (ClientError, Exception) as e:
+        BC.add_block(data = f"Error invoking SetPoolStatusClosed Lambda: {e}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
         raise RuntimeError(f"Error invoking SetPoolStatusClosed Lambda: {e}")
 
     try:
         pdf_result = generate_gridsheet_pdf(current_week)
         logging.info(f"Gridsheet PDF generated: {pdf_result}")
+        BC.add_block(data = f"Gridsheet PDF generated: {pdf_result}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
     except Exception as e:
         logging.exception(f"Error generating gridsheet PDF: {e}")
+        BC.add_block(data = f"Error generating gridsheet PDF: {e}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
         # Non-fatal — pool is already closed, just log it
 
     return {"statusCode": 200, "body": json.dumps({"status": "success", "message": f"Pool closed for week {current_week}"})}
