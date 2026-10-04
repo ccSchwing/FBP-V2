@@ -4,7 +4,7 @@
   "rawPath": "/generateGridsheetPdf",
   "rawQueryString": "",
   "headers": { "content-type": "application/json" },
-  "body": "{\"week\": 2}",
+  "body": "{\"week\": 4}",
   "requestContext": {
     "routeKey": "POST /generateGridsheetPdf",
     "stage": "$default",

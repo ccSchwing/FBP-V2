@@ -7,6 +7,7 @@ from fbplib.fbpLog import fbpLog
 from fbplib.getCurrentWeek import getCurrentWeek
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
+from fbpblockchain.blockchain import Blockchain as BChainClass
 
 logging.basicConfig(format="%(levelname)s %(message)s")
 logger = logging.getLogger()
@@ -38,11 +39,16 @@ HTML_TO_PDF_FUNCTION = os.environ.get("HTMLtoPDF", "HTMLtoPDF")
 # Open the pool for the next week.
 # Send out the weekly results email to all users.
 # That should do it.  : -)
+
+BC=BChainClass()
+BC.add_block("OpenPool Lambda initialized", week="0", email="fbpadmin@my-fbp.com", event="openPool")
+
 def generate_picksheet_pdf(week):
+    logger.info(f"Generating picksheet PDF for week {week}")
+    logger.info(f"Table name: {FBP_SCHEDULE_TABLE_NAME}")
     schedule = boto3.resource("dynamodb").Table(FBP_SCHEDULE_TABLE_NAME).query(
         KeyConditionExpression=boto3.dynamodb.conditions.Key("Week").eq(week)
     ).get("Items", [])
-
     domain = f"https://{CLOUDFRONT_DOMAIN}" if CLOUDFRONT_DOMAIN else "https://my-fbp.com"
 
     rows_html = ""
@@ -115,20 +121,32 @@ def generate_picksheet_pdf(week):
 @app.get("/openPool")
 def openPool():
     try:
+        week = getCurrentWeek()
         open_pool_status_check()
+        BC.add_block(data = "open_pool_status_check completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         invoke_import_spreads_and_final_scores()
+        BC.add_block(data = "invoke_import_spreads_and_final_scores completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         invoke_calc_weekly_results()
+        BC.add_block(data = "invoke_calc_weekly_results completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         invoke_update_weekly_results()
+        BC.add_block(data = "invoke_update_weekly_results completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         invoke_update_total_correct_and_incorrect_picks()
+        BC.add_block(data = "invoke_update_total_correct_and_incorrect_picks completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         invoke_advanced_messaging_service()
+        BC.add_block(data = "invoke_advanced_messaging_service completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         import_spreads_and_final_scores_for_new_week()
+        BC.add_block(data = "import_spreads_and_final_scores_for_new_week completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         set_pool_open()
+        week = getCurrentWeek()
+        BC.add_block(data = "set_pool_open completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         try:
             week = getCurrentWeek()
             pdf_result = generate_picksheet_pdf(week)
             logging.info(f"Picksheet PDF generated: {pdf_result}")
+            BC.add_block(data = "generate_picksheet_pdf completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         except Exception as e:
             logging.exception(f"Error generating picksheet PDF: {e}")  # Non-fatal
+            BC.add_block(data = f"Error generating picksheet PDF: {e}", week=week, email="fbpadmin@my-fbp.com", event="openPool")
     except RuntimeError as e:
         logging.error(f"openPool halted: {e}")
         fbpLog("fbpadmin@my-fbp.com", "openPool", f"openPool halted: {e}", "ERROR")
