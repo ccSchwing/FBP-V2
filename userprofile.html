@@ -237,13 +237,15 @@
       document.getElementById("lastName").value = responseBody.lastName || "";
       document.getElementById("displayName").value =
         responseBody.displayName || "";
-      const paymentMethod = responseBody.paymentMethod || "";
-      const paymentRadioButtons = document.querySelectorAll(
-        'input[name="paymentMethod"]',
-      );
-      paymentRadioButtons.forEach((radio) => {
-        radio.checked = radio.value === paymentMethod;
-      });
+      // Comment out the payment method section
+      // const paymentMethod = responseBody.paymentMethod || "";
+      // const paymentRadioButtons = document.querySelectorAll(
+      //   'input[name="paymentMethod"]',
+      // );
+      // paymentRadioButtons.forEach((radio) => {
+      //   radio.checked = radio.value === paymentMethod;
+      // });
+      
       // Comment out entire SMS Notifications Section
       /*
       document.getElementById("smsReminder").checked =
@@ -272,7 +274,7 @@
       const savedMobileNumber = responseBody.mobile_number || "";
       originalMobileNumberDigits = normalizePhoneDigits(savedMobileNumber);
       document.getElementById("MobileNumber").value = formatPhoneNumber(savedMobileNumber);
-      */ 
+      */
     }
 
     async function validateFormData() {
@@ -291,12 +293,13 @@
       if (displayName === "") {
         errorMessages.push("Display Name cannot be empty.");
       }
-      const paymentMethod = document.querySelector(
-        'input[name="paymentMethod"]:checked',
-      );
-      if (!paymentMethod) {
-        errorMessages.push("Please select a payment method for when you win.");
-      }
+      // Comment out the payment method validation section
+      // const paymentMethod = document.querySelector(
+      //   'input[name="paymentMethod"]:checked',
+      // );
+      // if (!paymentMethod) {
+      //   errorMessages.push("Please select a payment method for when you win.");
+      // }
       if (tieBreakerValue === "") {
         errorMessages.push("Default Monday Night Tiebreaker cannot be empty.");
       }
@@ -348,9 +351,9 @@
           lastName: formData.get("lastName"),
           email: resolvedEmail,
           displayName: formData.get("displayName"),
-          paymentMethod:
-            document.querySelector('input[name="paymentMethod"]:checked')
-              ?.value || "",
+          // paymentMethod:
+          //   document.querySelector('input[name="paymentMethod"]:checked')
+          //     ?.value || "",
           isAdmin: formData.has("isAdmin")
             ? formData.get("isAdmin") === "on"
             : !!existingProfile.isAdmin,
@@ -360,9 +363,9 @@
           isPaidUser: formData.has("isPaidUser")
             ? formData.get("isPaidUser") === "on"
             : !!existingProfile.isPaidUser,
-          paymentMethod:
-            document.querySelector('input[name="paymentMethod"]:checked')
-              ?.value || "",
+          // paymentMethod:
+          //   document.querySelector('input[name="paymentMethod"]:checked')
+          //     ?.value || "",
           emailPickSheet: formData.get("emailPickSheet") === "on",
           emailReminders: formData.get("emailReminders") === "on",
           emailGridSheet: formData.get("emailGridSheet") === "on",
@@ -465,7 +468,7 @@
           <label for="displayName">Display Name:</label>
           <input type="text" name="displayName" id="displayName" />
         </div>
-        <div id="paymentMethod" style="margin-bottom: 1.25rem;">
+        <!-- <div id="paymentMethod" style="margin-bottom: 1.25rem;">
           <label for="paymentMethod" style="margin-bottom:0.25em; font-weight:500; display:block;">Payment Method When
             You Win</label>
           <div class="payment-options">
@@ -486,10 +489,28 @@
               </span>
             </label>
           </div>
-        </div>
+        </div> -->
         <div>
           <label style="margin-bottom:0.25em; font-weight:500; display:block;">Email Notifications</label>
           <div class="notification-options">
+            <label class="toggle-label" for="emailPickSheet">
+              <input type="checkbox" name="emailPickSheet" id="emailPickSheet" class="toggle-input" />
+              <span class="toggle-switch"></span>
+              <span>Email PickSheet</span>
+            </label>
+            <label class="toggle-label" for="emailReminders">
+              <input type="checkbox" name="emailReminders" id="emailReminders" class="toggle-input" />
+              <span class="toggle-switch"></span>
+              <span>Email Reminder</span>
+            </label>
+            <label class="toggle-label" for="emailGridSheet">
+              <input type="checkbox" name="emailGridSheet" id="emailGridSheet" class="toggle-input" />
+              <span class="toggle-switch"></span>
+              <span>Email Gridsheet</span>
+            </label>
+          </div>
+
+          <!-- <div class="notification-options">
             <label class="payment-option" for="emailPickSheet">
               <input type="checkbox" name="emailPickSheet" id="emailPickSheet" />
               <span class="payment-option-ui">
@@ -511,7 +532,7 @@
                 <span>Email Gridsheet</span>
               </span>
             </label>
-          </div>
+          </div> -->
         </div>
         <!-- SMS Notifications Section  -->
         <!-- Comment out entire SMS Notifications Section -->
@@ -637,13 +658,13 @@
               responseBody.lastName || "";
             document.getElementById("displayName").value =
               responseBody.displayName || "";
-            const paymentMethod = responseBody.paymentMethod || "";
-            const paymentRadioButtons = document.querySelectorAll(
-              'input[name="paymentMethod"]',
-            );
-            paymentRadioButtons.forEach((radio) => {
-              radio.checked = radio.value === paymentMethod;
-            });
+            // const paymentMethod = responseBody.paymentMethod || "";
+            // const paymentRadioButtons = document.querySelectorAll(
+            //   'input[name="paymentMethod"]',
+            // );
+            // paymentRadioButtons.forEach((radio) => {
+            //   radio.checked = radio.value === paymentMethod;
+            // });
             document.getElementById("emailPickSheet").checked =
               responseBody.emailPickSheet || false;
             document.getElementById("emailReminders").checked =

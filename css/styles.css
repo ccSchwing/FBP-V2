@@ -11,6 +11,48 @@
     padding-top: 0.5rem;
 }
 
+/* Toggle switch styles */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+
+.toggle-input {
+  display: none;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 2.5rem;
+  height: 1.4rem;
+  background: #ccc;
+  border-radius: 1rem;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle-switch::after {
+  content: "";
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle-input:checked + .toggle-switch {
+  background: #4caf50;
+}
+
+.toggle-input:checked + .toggle-switch::after {
+  transform: translateX(1.1rem);
+}
+
 
 /* Show Weekly Results page responsive and table styles (continued) */
 @media (max-width: 900px) {

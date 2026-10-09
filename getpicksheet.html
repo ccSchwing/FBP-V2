@@ -115,6 +115,32 @@
       animation: spin 0.8s linear infinite;
     }
 
+    /* button styles */
+    #pickButtons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    #pickButtons button {
+      padding: 0.6rem 1.2rem;
+      font-size: 1rem;
+      background-color:#2196f3;
+      color: white;
+      border: none;
+      border-radius: 40px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      #pickButtons button {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.875rem;
+      }
+    }
+
+
     @keyframes spin {
       to {
         transform: rotate(360deg);
@@ -570,7 +596,7 @@
 
       savePicksButton.dataset.bound = "true";
       const defaultSaveLabel =
-        savePicksButton.textContent || "Save Your Picks";
+        savePicksButton.textContent || "Save My Picks";
       savePicksButton.addEventListener("click", async () => {
         if (savePicksButton.disabled) {
           return;
@@ -904,7 +930,7 @@ Press Cancel to go back and work on your picks before submitting.",
           <button type="button" id="allUnderdogs">All Underdogs</button>
           <button type="button" id="allRandom">Random</button>
           <button type="button" id="clearMyPicks">Clear My Picks</button>
-          <button type="button" id="savePicks">Save Your Picks</button>
+          <button type="button" id="savePicks">Save My Picks</button>
         </div>
       </form>
     </main>
