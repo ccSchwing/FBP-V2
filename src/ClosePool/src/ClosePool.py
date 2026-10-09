@@ -64,6 +64,7 @@ def closePool():
     logging.info("Handling closePool request")
     fbpLog("fbpadmin@my-fbp.com", "ClosePool", "Handling closePool request", "INFO")
     week = getCurrentWeek()
+    week=str(week)
     if week is None:
         raise RuntimeError("Could not determine current week")
     BC.add_block(data = "close_pool_request_received", week=week, email="fbpadmin@my-fbp.com", event="closePool")
@@ -78,7 +79,9 @@ def _close_pool_steps():
     FBPConfigTableName = os.environ.get("FBPConfigTableName", "FBP-Config")
     configTable = boto3.resource("dynamodb").Table(FBPConfigTableName)
     current_week = getCurrentWeek()
+    current_week=str(current_week)
     week = current_week
+    week=str(week)
     try:
         response = configTable.get_item(Key={"Week": current_week})
         if "Item" in response:
@@ -192,17 +195,18 @@ def _close_pool_steps():
     ##
     # Call generateGridsheet Lambda function to generate the gridsheet for the current week.
     try:
-        generate_gridsheet_pdf(current_week)
+        pdfWeek = getCurrentWeek()
+        generate_gridsheet_pdf(week=pdfWeek)
     except Exception as e:
-        logging.exception(f"Error generating gridsheet for week {current_week}: {e}")
+        logging.exception(f"Error generating gridsheet for week {pdfWeek}: {e}")
         fbpLog(
             "fbpadmin@my-fbp.com",
             "ClosePool",
-            f"Error generating gridsheet for week {current_week}: {e}",
+            f"Error generating gridsheet for week {pdfWeek}: {e}",
             "ERROR",
         )
-        BC.add_block(data = f"error_generating_gridsheet_for_week_{current_week}: {e}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
-        raise RuntimeError(f"Error generating gridsheet for week {current_week}: {e}")
+        BC.add_block(data = f"error_generating_gridsheet_for_week_{pdfWeek}: {e}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
+        raise RuntimeError(f"Error generating gridsheet for week {pdfWeek}: {e}")
 
     ##
     # Send gridsheet via AdvancedMessagingService for each channel.
