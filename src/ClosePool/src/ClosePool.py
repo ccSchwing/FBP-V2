@@ -50,11 +50,17 @@ app = APIGatewayHttpResolver(proxy_type=ProxyEventType.APIGatewayProxyEventV2, c
 
 ##
 # This method is only used for debugging
-## 
+##
 @app.post("/generateGridsheetPdf")
 def generateGridsheetPdf():
     body = app.current_event.json_body or {}
-    week = body.get("week") or getCurrentWeek()
+    week = 0
+    if not body:
+            week = getCurrentWeek()
+    else:
+        week = body.get("week") or getCurrentWeek()
+        if week:
+            week = int(week)
     result = generate_gridsheet_pdf(week)
     return {"statusCode": 200, "body": json.dumps({"result": result})}
 
@@ -83,7 +89,7 @@ def _close_pool_steps():
     week = current_week
     week=str(week)
     try:
-        response = configTable.get_item(Key={"Week": current_week})
+        response = configTable.get_item(Key={"Week": int(current_week)})
         if "Item" in response:
             pool_open = response["Item"].get("poolOpen", False)
             if pool_open == False:
@@ -109,7 +115,7 @@ def _close_pool_steps():
                     "INFO",
                 )
                 configTable.update_item(
-                    Key={"Week": current_week},
+                    Key={"Week": int(current_week)},
                     UpdateExpression="SET poolOpen = :open",
                     ExpressionAttributeValues={":open": False},
                 )
@@ -297,7 +303,7 @@ def _close_pool_steps():
         raise RuntimeError(f"Error invoking SetPoolStatusClosed Lambda: {e}")
 
     try:
-        pdf_result = generate_gridsheet_pdf(current_week)
+        pdf_result = generate_gridsheet_pdf(int(current_week))
         logging.info(f"Gridsheet PDF generated: {pdf_result}")
         BC.add_block(data = f"Gridsheet PDF generated: {pdf_result}", week=week, email="fbpadmin@my-fbp.com", event="closePool")
     except Exception as e:
