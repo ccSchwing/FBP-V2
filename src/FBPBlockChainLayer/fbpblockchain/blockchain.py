@@ -30,7 +30,7 @@ class Block:
         mytimestamp = datetime.now(pytz.utc).astimezone(pytz.timezone("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
         # self.timestamp = timestamp or mytimestamp 
         self.timestamp = mytimestamp
-        logger.info(f"Block timestamp set to: {self.timestamp}")
+        # logger.info(f"Block timestamp set to: {self.timestamp}")
         self.data = data
         self.previous_hash = previous_hash
         self.event = event
@@ -52,7 +52,7 @@ class Blockchain:
     def __init__(self):
         print(f"Initializing Blockchain with table: {FBP_BLOCKCHAIN_TABLE_NAME}")
         self.table = boto3.resource("dynamodb").Table(FBP_BLOCKCHAIN_TABLE_NAME)
-        print(f"Blockchain initialized with table: {self.table}")
+        # print(f"Blockchain initialized with table: {self.table}")
         self.chain = self._load_chain()
 
     def _load_chain(self):

@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from datetime import date, timedelta
 import boto3
 import logging
 from decimal import Decimal
@@ -9,8 +10,11 @@ from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Attr
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
+from boto3.dynamodb.conditions import Key
 from fbplib.fbpLog import fbpLog
 from fbplib.getCurrentWeek import getCurrentWeek
+
+from mypy_boto3_dynamodb import DynamoDBServiceResource
 
 
 '''
@@ -42,18 +46,64 @@ cors_config = CORSConfig(
 
 app = APIGatewayHttpResolver(cors=cors_config)
 
+def get_week_ending_date():
+    today = date.today()
+    days_since_monday = today.weekday() or 7   # if today IS Monday, go back 7 days
+    last_monday = today - timedelta(days=days_since_monday)
+    return last_monday.strftime("%m-%d-%Y")
+
+
+
+##
+# Swapping in this method for the original updateTotalCorrectAndIncorrectPicks method
+##
 @app.get("/updateTotalCorrectAndIncorrectPicks")
-def updateTotalCorrectAndIncorrectPicks():
+def updateTotalCorrectAndIncorrectPicksV2():
+
+    dynamodb: DynamoDBServiceResource = boto3.resource('dynamodb')
+    weekly_table: Any = dynamodb.Table(os.environ.get('FBPWeeklyResultsTablev2', '2026-FBP-Weekly-Results-v2'))
+    users_table: Any  = dynamodb.Table(os.environ.get('FBPUsersTableName', '2026-FBP-Users'))
+    users = users_table.scan().get('Items', [])
+    for user in users:
+        email = user.get('email')
+
+        # 1. Fetch all weekly results for this user
+        response = weekly_table.query(
+            KeyConditionExpression=Key('email').eq(email)
+        )
+        items = response['Items']
+
+        for item in items:
+            item.get('correctpicks', 0)
+            item.get('incorrectpicks', 0)
+            logger.info(f"User: {email}, Correct Picks: {item.get('correctpicks')}, Incorrect Picks: {item.get('incorrectpicks')}")
+        # 2. Compute totals from scratch
+        total_correct   = sum(int(item.get('correctpicks',   0)) for item in items)
+        total_incorrect = sum(int(item.get('incorrectpicks', 0)) for item in items)
+
+        # 3. Write computed totals to the Users table
+        users_table.update_item(
+            Key={'email': email},
+            UpdateExpression='SET totalCorrectPicks = :c, totalIncorrectPicks = :i',
+            ExpressionAttributeValues={':c': total_correct, ':i': total_incorrect}
+        )
+        logger.info(f"Updated total correct and incorrect picks for user {email}")
+
+##
+# This is the original method for updating total correct and incorrect picks
+##
+@app.get("/OldupdateTotalCorrectAndIncorrectPicks")
+def OldUpdateTotalCorrectAndIncorrectPicks():
     # Loop through the FBP_WEEKLY_RESULTS_TABLE and update
     # the FBP_USERS_TABLE with the total correct and incorrect
     # picks for each user for the season.
     FBP_USERS_TABLE_NAME = os.environ.get('FBPUsersTableName', '2026-FBP-Users')
     logger.info(f"Using FBP Users DynamoDB table: {FBP_USERS_TABLE_NAME}")
-    dynamodb = boto3.resource('dynamodb')
-    usersTable = dynamodb.Table(FBP_USERS_TABLE_NAME)
+    dynamodb: DynamoDBServiceResource = boto3.resource('dynamodb')
+    usersTable: Any = dynamodb.Table(FBP_USERS_TABLE_NAME)
     FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResultsTable', '2026-FBP-Weekly-Results')
     logger.info(f"Using DynamoDB table: {FBP_WEEKLY_RESULTS_TABLE}")
-    resultsTable = dynamodb.Table(FBP_WEEKLY_RESULTS_TABLE)
+    resultsTable: Any = dynamodb.Table(FBP_WEEKLY_RESULTS_TABLE)
 
     users=usersTable.scan().get('Items', [])
     for user in users:
@@ -99,7 +149,7 @@ def updateWeeklyResults():
     '''
     FBP_USERS_TABLE_NAME = os.environ.get('FBPUsersTableName', '2026-FBP-Users')
     logger.info(f"Using FBP Users DynamoDB table: {FBP_USERS_TABLE_NAME}")
-    dynamodb = boto3.resource('dynamodb')
+    dynamodb: DynamoDBServiceResource = boto3.resource('dynamodb')
     resultsTable = dynamodb.Table(FBP_WEEKLY_RESULTS_TABLE) 
     usersTable = dynamodb.Table(FBP_USERS_TABLE_NAME)
 
@@ -156,7 +206,7 @@ def updateWeeklyResults():
             if weeklyResults.status_code != 200:
                 logger.error("Failed to update weekly user results")
                 fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", "Failed to update weekly user results", "ERROR")
-                return weeklyResults
+                raise Exception("Failed to update weekly user results")
             else:
                 logger.info(f"Updated weekly user results for week {week}")
                 fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", f"Updated weekly user results for week {week}", "INFO")
@@ -164,21 +214,14 @@ def updateWeeklyResults():
     except ClientError as e:
         logger.exception(f"DynamoDB Error: {e}")
         fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", f"DynamoDB Error: {e}", "ERROR")
-        return Response (
-            status_code=500,
-            content_type="application/json",
-            body=json.dumps({'error': 'DynamoDB Error'}),
-        )
+        raise Exception(f"DynamoDB Error: {e}")
     except Exception as e:
         logger.exception(f"Unexpected error: {e}")
         fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", f"Unexpected error: {e}", "ERROR")
-        return Response (
-            status_code=500,
-            content_type="application/json",
-            body=json.dumps({'error': 'Unexpected error'}),
-        )
+        raise Exception(f"Unexpected error: {e}")
+
 def getResultsCalculatedValueForWeek(week: int) -> Any:
-    dynamodb = boto3.resource('dynamodb')
+    dynamodb: DynamoDBServiceResource = boto3.resource('dynamodb')
     FBP_CONFIG_TABLE_NAME = os.environ.get('FBPConfigTableName', 'FBP-Config')
     logger.info(f"Using FBP Config DynamoDB table: {FBP_CONFIG_TABLE_NAME}")
     configTable = dynamodb.Table(FBP_CONFIG_TABLE_NAME)
@@ -215,8 +258,8 @@ def getResultsCalculatedValueForWeek(week: int) -> Any:
             body=json.dumps({'error': f'Error retrieving configuration for week {week}'}),
         )
 
-def updateWeeklyUserResults(allUserPicks: List[Dict[str, Any]], resultsTable, usersTable, week: int) -> Response:
-    dynamodb = boto3.resource('dynamodb')
+def updateWeeklyUserResults(allUserPicks: List[Dict[str, Any]], resultsTable: Any, usersTable: Any, week: int) -> Response:
+    dynamodb: DynamoDBServiceResource = boto3.resource('dynamodb')
     FBP_CONFIG_TABLE_NAME = os.environ.get('FBPConfigTableName', 'FBP-Config')
     logger.info(f"Using FBP Config DynamoDB table: {FBP_CONFIG_TABLE_NAME}")
     configTable = dynamodb.Table(FBP_CONFIG_TABLE_NAME)
@@ -319,12 +362,38 @@ def updateWeeklyUserResults(allUserPicks: List[Dict[str, Any]], resultsTable, us
             fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", 
                    f"Failed to get displayName for {email} from DynamoDB: {e}", "ERROR")
         try:
+            ##
+            # This is where I need to update the new Result table
+            # Partion Key is email
+            # Sort Key is weekEnding '10-05-2026' (ISO 8601 date string)
+            # Index is WeekIndex with a partition key of Week(Number)
+            ##
+            # resultsTable.update_item(
+            #     Key={'email': email},
+            #     UpdateExpression="SET correctpicks = :c, incorrectpicks = :i, displayName = :d, #w = :w",
+            #     ExpressionAttributeNames={'#w': 'week'},
+            #     ExpressionAttributeValues={':c': Decimal(correctpicks), ':i': Decimal(incorrectpicks), ':d': displayName, ':w': Decimal(week)}
+            # )
+            weekEnding = get_week_ending_date()
             resultsTable.update_item(
-                Key={'email': email},
-                UpdateExpression="SET correctpicks = :c, incorrectpicks = :i, displayName = :d, #w = :w",
-                ExpressionAttributeNames={'#w': 'week'},
-                ExpressionAttributeValues={':c': Decimal(correctpicks), ':i': Decimal(incorrectpicks), ':d': displayName, ':w': Decimal(week)}
+                Key={
+                    'email': email,
+                    'weekEnding': weekEnding        # e.g. '10-05-2026'
+                },
+                UpdateExpression="SET correctpicks = :c, incorrectpicks = :i, displayName = :d, #w = :w, #W = :W",
+                ExpressionAttributeNames={
+                    '#w': 'week',                   # lowercase — existing attribute
+                    '#W': 'Week'                    # capital W — GSI partition key
+                },
+                ExpressionAttributeValues={
+                    ':c': Decimal(correctpicks),
+                    ':i': Decimal(incorrectpicks),
+                    ':d': displayName,
+                    ':w': Decimal(week),            # lowercase week (keep for compatibility)
+                    ':W': Decimal(week)             # capital Week (drives WeekIndex GSI)
+                }
             )
+ 
 
         # Still need to calc winner and set totalwins.
 

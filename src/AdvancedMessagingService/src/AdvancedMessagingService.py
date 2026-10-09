@@ -380,7 +380,7 @@ class EmailService:
         ##
         # add one to the current week to get the correct week for picks
         ##
-        week = week + 1
+        week = week
         subject = f"{self.company_name} Is Open for Picks for week {week}."
         html = f"""
         <html><body>

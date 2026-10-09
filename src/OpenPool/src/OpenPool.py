@@ -122,6 +122,7 @@ def generate_picksheet_pdf(week):
 def openPool():
     try:
         week = getCurrentWeek()
+        week=str(week)
         open_pool_status_check()
         BC.add_block(data = "open_pool_status_check completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         invoke_import_spreads_and_final_scores()
@@ -137,11 +138,10 @@ def openPool():
         import_spreads_and_final_scores_for_new_week()
         BC.add_block(data = "import_spreads_and_final_scores_for_new_week completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         set_pool_open()
-        week = getCurrentWeek()
         BC.add_block(data = "set_pool_open completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         try:
-            week = getCurrentWeek()
-            pdf_result = generate_picksheet_pdf(week)
+            pdfWeek=getCurrentWeek()
+            pdf_result = generate_picksheet_pdf(pdfWeek)
             logging.info(f"Picksheet PDF generated: {pdf_result}")
             BC.add_block(data = "generate_picksheet_pdf completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         except Exception as e:

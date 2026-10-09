@@ -1,17 +1,17 @@
 GameId,Week,Date,Away,Home,AwayScore,HomeScore,Spread,Winner,Underdog
-W4-01,4,2026-10-01,Steelers,Browns,0,0,2.5,H or A,H
-W4-02,4,2026-10-04,Colts,Commanders,0,0,3.5,H or A,H
-W4-03,4,2026-10-04,Titans,Ravens,0,0,11.5,H or A,A
-W4-04,4,2026-10-04,Patriots,Bills,0,0,6.5,H or A,A
-W4-05,4,2026-10-04,Jets,Bears,0,0,2.5,H or A,A
-W4-06,4,2026-10-04,Jaguars,Bengals,0,0,2.5,H or A,A
-W4-07,4,2026-10-04,Cowboys,Texans,0,0,2.5,H or A,H
-W4-08,4,2026-10-04,Cardinals,Giants,0,0,1.5,H or A,A
-W4-09,4,2026-10-04,Rams,Eagles,0,0,2.5,H or A,H
-W4-10,4,2026-10-04,Packers,Buccaneers,0,0,3.5,H or A,H
-W4-11,4,2026-10-04,Dolphins,Vikings,0,0,10.5,H or A,A
-W4-12,4,2026-10-04,Broncos,49ers,0,0,3.0,H or A,A
-W4-13,4,2026-10-04,Chiefs,Raiders,0,0,5.5,H or A,H
-W4-14,4,2026-10-04,Chargers,Seahawks,0,0,6.5,H or A,A
-W4-15,4,2026-10-04,Lions,Panthers,0,0,3.5,H or A,H
-W4-16,4,2026-10-05,Falcons,Saints,0,0,2.5,H or A,A
+W4-01,4,2026-10-01,Steelers,Browns,24,27,2.5,H,H
+W4-02,4,2026-10-04,Colts,Commanders,30,13,3.5,H,H
+W4-03,4,2026-10-04,Titans,Ravens,18,24,11.5,A,A
+W4-04,4,2026-10-04,Patriots,Bills,29,26,6.5,A,H
+W4-05,4,2026-10-04,Jets,Bears,12,23,2.5,A,H
+W4-06,4,2026-10-04,Jaguars,Bengals,22,17,2.5,H,A
+W4-07,4,2026-10-04,Cowboys,Texans,34,30,2.5,H,H
+W4-08,4,2026-10-04,Cardinals,Giants,24,36,1.5,H,A
+W4-09,4,2026-10-04,Rams,Eagles,24,20,2.5,H,A
+W4-10,4,2026-10-04,Packers,Buccaneers,17,14,3.5,H,H
+W4-11,4,2026-10-04,Dolphins,Vikings,10,15,10.5,H,A
+W4-12,4,2026-10-04,Broncos,49ers,14,24,3.0,H,A
+W4-13,4,2026-10-04,Chiefs,Raiders,30,27,5.5,H,H
+W4-14,4,2026-10-04,Chargers,Seahawks,23,30,6.5,H,A
+W4-15,4,2026-10-04,Lions,Panthers,26,32,3.5,A,H
+W4-16,4,2026-10-05,Falcons,Saints,45,24,2.5,H,A

@@ -27,6 +27,13 @@ Parameters:
   FBPWeeklyResultsTableName:
     Type: String
     Default: FBP-Weekly-Results
+  FBPWeeklyResultsTableNamev2:
+    Type: String
+    Default: FBP-Weekly-Results
+  KMSKeyArn:
+    Type: String
+    Description: ARN of the KMS key used for table encryption
+    Default: arn:aws:kms:us-east-1:768286545465:key/f4889602-0554-4e9d-b161-91ffccb21e07
   FBPBlockChainTableName:
     Type: String
     Default: FBPBlockChain
@@ -202,6 +209,59 @@ Resources:
       Tags:
         - Key: Name
           Value: TransactionsTable
+  FBPWeeklyResultsV2:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: 2026-FBP-Weekly-Results-v2
+      BillingMode: PAY_PER_REQUEST
+
+      # --- Key schema ---
+      # email     : partition key (same as original)
+      # weekEnding: sort key (new) — ISO 8601 date string, e.g. "2026-10-05"
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: weekEnding
+          AttributeType: S
+        - AttributeName: Week
+          AttributeType: N
+
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH
+        - AttributeName: weekEnding
+          KeyType: RANGE
+
+      # --- GSI: query all users' results for a given week number ---
+      GlobalSecondaryIndexes:
+        - IndexName: WeekIndex
+          KeySchema:
+            - AttributeName: Week
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+      # --- Encryption: use the same KMS key as the original table ---
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref KMSKeyArn
+
+      # --- Safety: prevent accidental deletion ---
+      DeletionProtectionEnabled: true
+
+      TableClass: STANDARD
+
+      Tags:
+        - Key: Project
+          Value: FBP
+        - Key: Year
+          Value: "2026"
+        - Key: MigratedFrom
+          Value: 2026-FBP-Weekly-Results
+
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -1536,7 +1596,7 @@ Resources:
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
           FBPPicksTableName: !Sub "${Year}-FBP-Picks"
           FBPLogsTableName: !Sub "${Year}-Log"
-          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+          FBPWeeklyResultsTableNamev2: !Sub "${Year}-FBP-Weekly-Results-v2"
           FBPScheduleTableName: !Sub "${Year}-Schedule"
       Layers:
         - !Ref FBPLibLayer

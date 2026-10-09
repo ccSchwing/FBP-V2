@@ -36,7 +36,7 @@ def importSpreadsAndFinalScores(event, context):
             'body': json.dumps({'error': 'Failed to determine current week'})
         }
     
-    csvKey = f"schedule/{os.environ.get('Year')}-Schedule/week{int(week)}-schedule.csv"
+    csvKey = f"schedule/{os.environ.get('Year')}-Schedule/week{int(week)}-Schedule.csv"
     logger.info(f"Constructed S3 key for CSV file: {csvKey}")  # Log the constructed S3 key
     try:
         response = s3.get_object(Bucket=bucket_name, Key=csvKey)
