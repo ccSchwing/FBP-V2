@@ -6,9 +6,14 @@ import json
 from datetime import datetime
 from decimal import Decimal
 import logging
+from fbplib.getCurrentWeek import getCurrentWeek
+from fbpblockchain.blockchain import Blockchain
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+blockchain = Blockchain()
+
 
 def clean_dynamodb_dataframe(df):
     """Clean DynamoDB DataFrame by converting Decimals"""
@@ -46,7 +51,7 @@ def export_dynamodb_to_kb(event, context):
 
         # Step 3: Trigger KB sync
         sync_knowledge_base()
-        
+        blockchain.add_block(data="KB Sync Completed", week=str(getCurrentWeek()), event="ChatBotSync")
         return {
             'statusCode': 200,
             'body': json.dumps({
@@ -231,6 +236,7 @@ def export_tables_to_csv():
                 
         except Exception as e:
             logger.error(f"Error exporting table {table_name}: {str(e)}")
+            blockchain.add_block(data=f"Error exporting {table_name}", week=str(getCurrentWeek()), event="ChatBotSync")
             #continue
             return None
     
@@ -274,6 +280,8 @@ def upload_csvs_to_s3(csv_files):
             
         except Exception as e:
             logger.error(f"Error uploading {csv_file}: {str(e)}")
+            blockchain.add_block(data=f"Error uploading {csv_file}", week=str(getCurrentWeek()), event="ChatBotSync")
+            raise RuntimeError(f"Error uploading {csv_file}")
 
 def sync_knowledge_base():
     """Trigger Knowledge Base sync"""
@@ -288,9 +296,9 @@ def sync_knowledge_base():
         
         job_id = response['ingestionJob']['ingestionJobId']
         logger.info(f"Knowledge Base sync started: {job_id}")
-        
         return job_id
         
     except Exception as e:
         logger.error(f"Error starting KB sync: {str(e)}")
+        blockchain.add_block(data="KB Sync Failed", week=str(getCurrentWeek()), event="ChatBotSync")
         raise

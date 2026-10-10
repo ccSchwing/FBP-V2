@@ -567,6 +567,7 @@ Resources:
       Runtime: python3.12
       Layers:
         - !Ref FBPLibLayer
+        - !Ref FBPBlockChainLayer
       Environment:
         Variables:
           KnowledgeBaseId: !Ref KnowledgeBaseId
@@ -590,8 +591,15 @@ Resources:
             TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-FBP-Weekly-Results"
+        - DynamoDBCrudPolicy:
+            TableName: !Sub "${Year}-FBPBlockChain"
         - Version: '2012-10-17'
           Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:PutItem
+              Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBPBlockChain
             - Effect: Allow
               Action:
                 - dynamodb:Scan
