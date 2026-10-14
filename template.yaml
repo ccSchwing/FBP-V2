@@ -1781,7 +1781,7 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Sub "${Year}-FBP-Weekly-Results"
+            TableName: !Sub "${Year}-FBP-Weekly-Results-v2"
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:
@@ -1796,7 +1796,7 @@ Resources:
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
           FBPPicksTableName: !Sub "${Year}-FBP-Picks"
           FBPLogsTableName: !Sub "${Year}-Log"
-          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
+          FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results-v2"
       Layers:
         - !Ref FBPLibLayer
       Events:
