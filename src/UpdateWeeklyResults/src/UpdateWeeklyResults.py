@@ -58,7 +58,7 @@ def get_week_ending_date():
 # Swapping in this method for the original updateTotalCorrectAndIncorrectPicks method
 ##
 @app.get("/updateTotalCorrectAndIncorrectPicks")
-def updateTotalCorrectAndIncorrectPicksV2():
+def updateTotalCorrectAndIncorrectPicks():
 
     dynamodb: DynamoDBServiceResource = boto3.resource('dynamodb')
     weekly_table: Any = dynamodb.Table(os.environ.get('FBPWeeklyResultsTablev2', '2026-FBP-Weekly-Results-v2'))
@@ -101,7 +101,7 @@ def OldUpdateTotalCorrectAndIncorrectPicks():
     logger.info(f"Using FBP Users DynamoDB table: {FBP_USERS_TABLE_NAME}")
     dynamodb: DynamoDBServiceResource = boto3.resource('dynamodb')
     usersTable: Any = dynamodb.Table(FBP_USERS_TABLE_NAME)
-    FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResultsTable', '2026-FBP-Weekly-Results')
+    FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResultsTablev2', '2026-FBP-Weekly-Results-v2')
     logger.info(f"Using DynamoDB table: {FBP_WEEKLY_RESULTS_TABLE}")
     resultsTable: Any = dynamodb.Table(FBP_WEEKLY_RESULTS_TABLE)
 
@@ -133,7 +133,7 @@ def OldUpdateTotalCorrectAndIncorrectPicks():
 
 @app.get("/updateWeeklyResults")
 def updateWeeklyResults():
-    FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResultsTable', '2026-FBP-Weekly-Results')
+    FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResultsTablev2', '2026-FBP-Weekly-Results-v2')
     logger.info(f"Using DynamoDB table: {FBP_WEEKLY_RESULTS_TABLE}")  # Log the table name being used
     fbpLog("fbpadmin@my-fbp.com", "UpdateWeeklyResults", "Retrieving weekly results", "INFO")
     '''
@@ -446,8 +446,9 @@ def updateWeeklyUserResults(allUserPicks: List[Dict[str, Any]], resultsTable: An
     items = response['Items']
     max_item = max(items, key=lambda x: x.get('correctpicks', 0))
     email = max_item['email']
+    weekEnding = max_item['weekEnding']
     resultsTable.update_item(
-        Key={'email': email},
+        Key={'email': email, 'weekEnding': weekEnding},
         UpdateExpression="SET #Winner = :w",
         ExpressionAttributeNames={'#Winner': 'winner'},
         ExpressionAttributeValues={':w': True}

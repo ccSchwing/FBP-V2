@@ -29,7 +29,7 @@ Parameters:
     Default: FBP-Weekly-Results
   FBPWeeklyResultsTableNamev2:
     Type: String
-    Default: FBP-Weekly-Results
+    Default: FBP-Weekly-Results-v2
   KMSKeyArn:
     Type: String
     Description: ARN of the KMS key used for table encryption
@@ -1591,7 +1591,7 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-FBP-Users"
         - DynamoDBCrudPolicy:
-            TableName: !Sub "${Year}-FBP-Weekly-Results"
+            TableName: !Sub "${Year}-FBP-Weekly-Results-v2"
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-Log"
         - DynamoDBReadPolicy:

@@ -100,7 +100,7 @@ def importSpreadsAndFinalScores(event, context):
         archive_key = f"schedule/{os.environ.get('Year')}-Schedule/archive/week{week}-schedule.csv"
         try:
             s3.copy_object(Bucket=bucket_name, CopySource={'Bucket': bucket_name, 'Key': csvKey}, Key=archive_key)
-            s3.delete_object(Bucket=bucket_name, Key=csvKey)
+            # s3.delete_object(Bucket=bucket_name, Key=csvKey)
             logger.info(f"Moved processed file from {csvKey} to {archive_key} in bucket: {bucket_name}")
             fbpLog("fbpadmin@my-fbp.com", "ImportSpreads", 
                    f"Moved processed file from {csvKey} to {archive_key} in bucket: {bucket_name}", "INFO")
