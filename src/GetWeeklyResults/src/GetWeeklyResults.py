@@ -39,7 +39,7 @@ app=APIGatewayHttpResolver(cors=cors_config)
 
 @app.get("/getWeeklyResults")
 def getWeeklyResults():
-    FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResultsTableName', 'FBP-Weekly-Results-2025')
+    FBP_WEEKLY_RESULTS_TABLE = os.environ.get('FBPWeeklyResultsTableName', '2026-FBP-Weekly-Results-v2')
     logger.info(f"Using DynamoDB table: {FBP_WEEKLY_RESULTS_TABLE}")  # Log the table name being used
     fbpLog("fbpadmin@my-fbp.com", "GetWeeklyResults", "Lambda function initialized", "INFO")
     fbpLog("fbpadmin@my-fbp.com", "GetWeeklyResults", "Retrieving weekly results", "INFO")
@@ -94,11 +94,8 @@ def getWeeklyResults():
             email = user['email']
             userResponse = usersTable.get_item(Key={'email': email})
             userItem = userResponse.get('Item')
-            if userItem['userType'] == 'user':
-                if userItem:
-                    user['displayName'] = userItem.get('displayName', 'Unknown User')
-                else:
-                    user['displayName'] = 'Unknown User'
+            if userItem and userItem.get('userType') == 'user':
+                user['displayName'] = userItem.get('displayName', 'Unknown User')
                 userPicks.append(user)
             # Skip of userType is not 'user'
         sortedPicks=sortWeeklyResults(picks=userPicks)
