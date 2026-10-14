@@ -57,7 +57,7 @@ def importSpreadsAndFinalScores(event, context):
         spreads_data = list(reader)
 
         logger.info(f"Retrieved {len(spreads_data)} objects from bucket: {bucket_name}")
-        week = getCurrentWeek()
+        # week = getCurrentWeek()
         for spread in spreads_data:
             game_id = spread.pop('GameId', None)  # save before popping
             spread['Week'] = week

@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     💬 FBP Assistant
                 </button>
                 <div id="chat-body">
+                    <div id="chat-resize-handle">⠿</div>
                     <div id="chat-messages"></div>
                     <div id="chat-input-row">
                         <input type="text" id="chat-input" placeholder="Ask me about FBP..." autocomplete="off">
@@ -23,6 +24,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     document.getElementById('chat-input').addEventListener('keydown', e => {
         if (e.key === 'Enter') sendChatBotMessage();
+    });
+
+    // Resize logic
+    const handle = document.getElementById('chat-resize-handle');
+    const body   = document.getElementById('chat-body');
+    handle.addEventListener('mousedown', e => {
+        e.preventDefault();
+        const startY = e.clientY;
+        const startH = body.offsetHeight;
+        const startW = body.offsetWidth;
+        const startX = e.clientX;
+        const onMove = mv => {
+            body.style.height = Math.max(200, startH - (mv.clientY - startY)) + 'px';
+            body.style.width  = Math.max(240, startW - (mv.clientX - startX)) + 'px';
+        };
+        const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
     });
     window.sendChatBotMessage = sendChatBotMessage;
 });

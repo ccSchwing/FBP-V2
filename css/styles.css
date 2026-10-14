@@ -1026,13 +1026,25 @@ footer {
   display: none;
   flex-direction: column;
   width: 320px;
-  max-height: 420px;
+  height: 420px;
   background: #fff;
   border: 1px solid #ddd;
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   margin-bottom: 0.5rem;
   overflow: hidden;
+}
+
+#chat-resize-handle {
+  text-align: center;
+  cursor: nwse-resize;
+  color: #aaa;
+  font-size: 1rem;
+  padding: 2px 0;
+  user-select: none;
+  background: #f7f7f7;
+  border-bottom: 1px solid #eee;
+  border-radius: 12px 12px 0 0;
 }
 
 #chat-widget.open #chat-body {
