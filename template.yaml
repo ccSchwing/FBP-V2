@@ -34,6 +34,9 @@ Parameters:
     Type: String
     Description: ARN of the KMS key used for table encryption
     Default: arn:aws:kms:us-east-1:768286545465:key/f4889602-0554-4e9d-b161-91ffccb21e07
+  OddsApiSecretName:
+    Type: String
+    Default: fbp/the-odds-api
   FBPBlockChainTableName:
     Type: String
     Default: FBPBlockChain
@@ -61,6 +64,9 @@ Parameters:
   FBPWeeklyResultsWeekIndexName:
     Type: String
     Default: WeekIndex
+  S3SubDir:
+    Type: String
+    Default: schedule
   TransactionsTableName:
     Type: String
     Default: Transactions
@@ -800,6 +806,33 @@ Resources:
             Path: /payout
             Method: post
             PayloadFormatVersion: '2.0'
+  # ── Generate Spreads Lambda ──────────────────────────────────────────────
+  GenerateSpreads:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: fbp-generate-spreads
+      Handler: GenerateSpreads.lambda_handler
+      Runtime: python3.12
+      Layers:
+        - !Ref FBPLibLayer
+      Timeout: 30
+      MemorySize: 128
+      CodeUri: src/GenerateSpreads/src/
+      Environment:
+        Variables:
+          Year: !Ref Year
+          S3Prefix: !Sub "${S3SubDir}/${Year}"
+          S3BucketName: !Ref S3BucketName
+          OddsApiSecretName: !Ref OddsApiSecretName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:fbp/odds-api-key*"
+            - Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub "arn:aws:s3:::${S3BucketName}/schedules/*"
   ImportSpreadsAndFinalScores:
     Type: AWS::Serverless::Function
     Properties:

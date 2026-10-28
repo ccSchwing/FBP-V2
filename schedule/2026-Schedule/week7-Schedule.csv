@@ -1,0 +1,15 @@
+GameId,Week,Date,Away,Home,AwayScore,HomeScore,Spread,Winner,Underdog
+W7-01,7,2026-10-22,Patriots,Bears,24,30,3.5,H,H
+W7-02,7,2026-10-25,Steelers,Saints,16,10,3.5,H,A
+W7-03,7,2026-10-25,49ers,Falcons,20,29,3.5,H,H
+W7-04,7,2026-10-25,Bengals,Ravens,35,13,3.5,A,H
+W7-05,7,2026-10-25,Browns,Titans,27,24,2.5,H,A
+W7-06,7,2026-10-25,Colts,Vikings,10,16,6.5,A,H
+W7-07,7,2026-10-25,Dolphins,Jets,28,25,3.5,A,A
+W7-08,7,2026-10-25,Giants,Texans,27,21,10.5,A,H
+W7-09,7,2026-10-25,Buccaneers,Panthers,43,13,2.5,A,A
+W7-10,7,2026-10-25,Broncos,Cardinals,30,16,4.5,A,H
+W7-11,7,2026-10-25,Packers,Lions,17,20,3.5,H,H
+W7-12,7,2026-10-25,Rams,Raiders,35,21,3.5,H,A
+W7-13,7,2026-10-25,Chiefs,Seahawks,3,20,2.5,H,A
+W7-14,7,2026-10-26,Cowboys,Eagles,38,21,4.5,A,A
