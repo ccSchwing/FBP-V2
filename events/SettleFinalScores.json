@@ -1,20 +1,20 @@
 {
   "version": "2.0",
-  "routeKey": "GET /fetchFinalScores",
-  "rawPath": "/fetchFinalScores",
+  "routeKey": "GET /settleFinalScores",
+  "rawPath": "/settleFinalScores",
   "rawQueryString": "",
   "headers": {
     "content-type": "application/json"
   },
-  "body": "{\"week\": 7}",
+  "body": "{\"week\": \"7\"}",
   "requestContext": {
-    "routeKey": "GET /fetchFinalScores",
+    "routeKey": "GET /settleFinalScores",
     "stage": "$default",
     "requestId": "local-request-id",
     "apiId": "local",
     "http": {
       "method": "GET",
-      "path": "/fetchFinalScores",
+      "path": "/settleFinalScores",
       "protocol": "HTTP/1.1",
       "sourceIp": "127.0.0.1",
       "userAgent": "sam-local"

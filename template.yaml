@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Globals:
   Function:
@@ -37,6 +37,9 @@ Parameters:
   OddsApiSecretName:
     Type: String
     Default: fbp/the-odds-api
+  EndzoneApiKeySecretName:
+    Type: String
+    Default: fbp/endzoneapikey
   FBPBlockChainTableName:
     Type: String
     Default: FBPBlockChain
@@ -128,14 +131,13 @@ Resources:
         AllowOrigins:
           - "*"
         MaxAge: 300
-  MyApiMapping:          # ← add it here, same level as everything else
+  MyApiMapping: # ← add it here, same level as everything else
     Type: AWS::ApiGatewayV2::ApiMapping
     DependsOn: FBPHttpApiprodStage
     Properties:
       DomainName: my-fbp.com
       ApiId: !Ref FBPHttpApi
       Stage: prod
-
 
   FBPBlockChainTable:
     Type: AWS::DynamoDB::Table
@@ -180,7 +182,7 @@ Resources:
               KeyType: HASH
           Projection:
             ProjectionType: ALL
-  
+
   TransactionsTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
@@ -317,7 +319,7 @@ Resources:
       Type: A
       AliasTarget:
         DNSName: !GetAtt CloudFrontDistribution.DomainName
-        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront hosted zone ID (always this value)
+        HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID (always this value)
         EvaluateTargetHealth: false
 
   # Route 53 AAAA Record (IPv6)
@@ -342,7 +344,7 @@ Resources:
         - python3.12
     Metadata:
       BuildMethod: python3.12
-      
+
   FBPBlockChainLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
@@ -352,7 +354,6 @@ Resources:
         - python3.12
     Metadata:
       BuildMethod: makefile
-      
 
   # TwilioLayer:
   #   Type: AWS::Serverless::LayerVersion
@@ -425,7 +426,7 @@ Resources:
           LD_LIBRARY_PATH: /opt/lib
           CloudFrontDomain: !Ref CloudFrontDomain
       Policies:
-        - Version: '2012-10-17'
+        - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
@@ -441,14 +442,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /htmlToPdf
             Method: post
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         HTMLtoPDFOptionsApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /htmlToPdf
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
   BlockChainUtils:
     Type: AWS::Serverless::Function
     Properties:
@@ -465,7 +466,7 @@ Resources:
           FBPBlockChainEventIndexName: !Ref FBPBlockChainEventIndexName
           FBPBlockChainWeekIndexName: !Ref FBPBlockChainWeekIndexName
       Policies:
-        - Version: '2012-10-17'
+        - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
@@ -473,7 +474,7 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:Scan
                 - dynamodb:Query
-              Resource: 
+              Resource:
                 - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBPBlockChain
                 - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBPBlockChain/index/${FBPBlockChainEmailIndexName}
                 - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBPBlockChain/index/${FBPBlockChainEventIndexName}
@@ -491,28 +492,28 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /blockchainSearch
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         BlockChainSearchOptionsApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /blockchainSearch
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         BlockchainAttributesApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getBlockchainAttributes
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         BlockchainAttributesOptionsApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getBlockchainAttributes
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   ChatBot:
     Type: AWS::Serverless::Function
@@ -531,7 +532,7 @@ Resources:
           S3BucketName: !Ref S3BucketName
           FBPBlockChainTableName: !Sub "${Year}-FBPBlockChain"
       Policies:
-        - Version: '2012-10-17'
+        - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
@@ -544,7 +545,7 @@ Resources:
                 - bedrock:RetrieveAndGenerate
                 - bedrock:Retrieve
                 - bedrock:AgenticRetrieveStream
-              Resource: '*'
+              Resource: "*"
             - Effect: Allow
               Action:
                 - logs:CreateLogGroup
@@ -563,7 +564,7 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /chatbot
             Method: post
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
   ChatBotSync:
     Type: AWS::Serverless::Function
     Properties:
@@ -599,7 +600,7 @@ Resources:
             TableName: !Sub "${Year}-FBP-Weekly-Results"
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-FBPBlockChain"
-        - Version: '2012-10-17'
+        - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
@@ -610,7 +611,7 @@ Resources:
               Action:
                 - dynamodb:Scan
                 - dynamodb:GetItem
-              Resource: '*'
+              Resource: "*"
             - Effect: Allow
               Action:
                 - bedrock:RetrieveAndGenerate
@@ -641,14 +642,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /chatbotsync
             Method: post
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         ChatBotSyncOptionsApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /chatbotsync
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
   GetCurrentWeek:
     Type: AWS::Serverless::Function
     Properties:
@@ -674,14 +675,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getCurrentWeek
             Method: post
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetCurrentWeekOptionsApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getCurrentWeek
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
   UpdateTeamRecords:
     Type: AWS::Serverless::Function
     Properties:
@@ -713,14 +714,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /updateTeamRecords
             Method: get
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         TeamRecordOptionsApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /updateTeamRecords
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
   GetTeamRecords:
     Type: AWS::Serverless::Function
     Properties:
@@ -749,14 +750,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getTeamRecords
             Method: get
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetTeamRecordsOptionsApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getTeamRecords
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
   FBPPayoutLedger:
     Type: AWS::Serverless::Function
     Properties:
@@ -791,21 +792,21 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getFBPLedger
             Method: get
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         FBPLedgerPostDepositApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /deposit
             Method: post
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         FBPLedgerPostPayoutApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /payout
             Method: post
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
   # ── Generate Spreads Lambda ──────────────────────────────────────────────
   GenerateSpreads:
     Type: AWS::Serverless::Function
@@ -832,7 +833,37 @@ Resources:
               Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:fbp/odds-api-key*"
             - Effect: Allow
               Action: s3:PutObject
-              Resource: !Sub "arn:aws:s3:::${S3BucketName}/schedules/*"
+              Resource: !Sub "arn:aws:s3:::${S3BucketName}/${S3SubDir}/*"
+  SettleFinalScores:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: fbp-settle-final-scores
+      Handler: SettleFinalScores.lambda_handler
+      Runtime: python3.12
+      Layers:
+        - !Ref FBPLibLayer
+      Timeout: 30
+      MemorySize: 128
+      CodeUri: src/SettleFinalScores/src/
+      Environment:
+        Variables:
+          Year: !Ref Year
+          S3Prefix: !Sub "${S3SubDir}/${Year}"
+          S3BucketName: !Ref S3BucketName
+          EndzoneApiSecretName: !Ref EndzoneApiKeySecretName
+          FBPConfigTableName: !Sub "${Year}-FBP-Config"
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:fbp/endzoneapikey*"
+            - Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub "arn:aws:s3:::${S3BucketName}/${S3SubDir}/*"
+            - Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub "arn:aws:s3:::${S3BucketName}/${S3SubDir}/*"
   ImportSpreadsAndFinalScores:
     Type: AWS::Serverless::Function
     Properties:
@@ -858,7 +889,7 @@ Resources:
             TableName: !Sub "${Year}-Schedule"
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-FBPBlockChain"
-        - Version: '2012-10-17'
+        - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
@@ -906,7 +937,7 @@ Resources:
           HTMLtoPDF: !Ref HTMLtoPDF # Generate picksheet PDF.
           FBPBlockChainTableName: !Sub "${Year}-FBPBlockChain"
       Policies:
-        - Version: '2012-10-17'
+        - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
@@ -978,7 +1009,7 @@ Resources:
           AdvancedMessagingService: !Ref AdvancedMessagingService # Send messages to users about new week and weekly results.
           HTMLtoPDF: !Ref HTMLtoPDF # Generate gridsheet PDF.
       Policies:
-        - Version: '2012-10-17'
+        - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
@@ -1009,14 +1040,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /closePool
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         ClosePoolOPTIONS:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /closePool
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   EmailForwarding:
     Type: AWS::Serverless::Function
@@ -1034,7 +1065,7 @@ Resources:
           FROM_EMAIL: !Ref FromEmail
           SESBucketName: !Ref SESBucketName
       Policies:
-        - Version: '2012-10-17'
+        - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
@@ -1044,7 +1075,7 @@ Resources:
               Action:
                 - ses:SendEmail
                 - ses:SendRawEmail
-              Resource: '*'
+              Resource: "*"
             - Effect: Allow
               Action:
                 - logs:CreateLogGroup
@@ -1063,7 +1094,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -1074,7 +1105,7 @@ Resources:
       Policies:
         - PolicyName: S3Policy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -1090,16 +1121,16 @@ Resources:
                   - !Sub arn:aws:s3:::${S3BucketName}
         - PolicyName: SESPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
                   - ses:SendEmail
                   - ses:SendRawEmail
-                Resource: '*'
+                Resource: "*"
         - PolicyName: DynamoDBPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -1116,13 +1147,13 @@ Resources:
 
         - PolicyName: XRayPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
                   - xray:PutTraceSegments
                   - xray:PutTelemetryRecords
-                Resource: '*'
+                Resource: "*"
 
   AdvancedMessagingService:
     Type: AWS::Serverless::Function
@@ -1144,14 +1175,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /advanced-messaging
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         AdvancedMessagingServiceOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /advanced-messaging
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
       Environment:
         Variables:
           FROM_EMAIL: !Ref FromEmail
@@ -1174,7 +1205,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -1185,22 +1216,22 @@ Resources:
       Policies:
         - PolicyName: SESPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
                   - ses:SendEmail
                   - ses:SendRawEmail
-                Resource: '*'
+                Resource: "*"
         - PolicyName: XRayPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
                   - xray:PutTraceSegments
                   - xray:PutTelemetryRecords
-                Resource: '*'
+                Resource: "*"
 
   AdvancedEmailService:
     Type: AWS::Serverless::Function
@@ -1222,14 +1253,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /advanced-email
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetUserStatusOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /advanced-email
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
       Environment:
         Variables:
           # Add any environment variables your new service needs
@@ -1251,7 +1282,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -1262,7 +1293,7 @@ Resources:
       Policies:
         - PolicyName: SESPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -1270,10 +1301,10 @@ Resources:
                   - ses:SendRawEmail
                   - ses:SendTemplatedEmail
                   - ses:SendBulkTemplatedEmail
-                Resource: '*'
+                Resource: "*"
         - PolicyName: DynamoDBPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -1316,14 +1347,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getUserStatus
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetUserStatusOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getUserStatus
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   QueryFBPLogs:
     Type: AWS::Serverless::Function
@@ -1349,14 +1380,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /queryFBPLogs
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         QueryFBPLogsOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /queryFBPLogs
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   GetSchedule:
     Type: AWS::Serverless::Function
@@ -1385,14 +1416,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getschedule
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetScheduleOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getschedule
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
   ResetDBs:
     Type: AWS::Serverless::Function
     Properties:
@@ -1426,14 +1457,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /resetDBs
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         ResetDBsOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /resetDBs
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   SendEmail:
     Type: AWS::Serverless::Function
@@ -1462,14 +1493,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /sendEmail
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         SendEmailOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /sendEmail
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   GetStandings:
     Type: AWS::Serverless::Function
@@ -1499,14 +1530,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getStandings
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetStandingsOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getStandings
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   GetListForEmail:
     Type: AWS::Serverless::Function
@@ -1536,14 +1567,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getListForEmail
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetListForEmailOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getListForEmail
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   GetFBPEmailAndDisplayName:
     Type: AWS::Serverless::Function
@@ -1570,14 +1601,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getFBPUserEmailAndDisplayName
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetFBPEmailAndDisplayNameOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getFBPUserEmailAndDisplayName
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
   GetAllFBPEmailAndDisplayName:
     Type: AWS::Serverless::Function
     Properties:
@@ -1603,14 +1634,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getAllFBPUserEmailAndDisplayName
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetAllFBPEmailAndDisplayNameOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getAllFBPUserEmailAndDisplayName
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
   UpdateWeeklyResults:
     Type: AWS::Serverless::Function
     Properties:
@@ -1648,30 +1679,29 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /updateWeeklyResults
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         UpdateWeeklyResultsOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /updateWeeklyResults
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         UpdateTotalCorrectAndIncorrectPicksGET:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /updateTotalCorrectAndIncorrectPicks
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         UpdateTotalCorrectAndIncorrectPicksOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /updateTotalCorrectAndIncorrectPicks
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
-  
   UpdatePartialWeeklyResults:
     Type: AWS::Serverless::Function
     Properties:
@@ -1709,14 +1739,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /updatePartialWeeklyResults
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         UpdatePartialWeeklyResultsOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /updatePartialWeeklyResults
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   CalcWeeklyResults:
     Type: AWS::Serverless::Function
@@ -1752,14 +1782,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /calcWeeklyResults
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         CalcWeeklyResultsOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /calcWeeklyResults
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   CalcPartialResults:
     Type: AWS::Serverless::Function
@@ -1795,14 +1825,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /calcPartialResults
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         CalcPartialResultsOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /calcPartialResults
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   GetWeeklyResults:
     Type: AWS::Serverless::Function
@@ -1820,7 +1850,7 @@ Resources:
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-FBP-Picks"
         - DynamoDBReadPolicy:
-            TableName: !Sub 
+            TableName: !Sub
         - DynamoDBReadPolicy:
             TableName: !Sub "${Year}-FBP-Config"
       Environment:
@@ -1839,14 +1869,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getWeeklyResults
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetWeeklyResultsOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getWeeklyResults
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   GetPartialResults:
     Type: AWS::Serverless::Function
@@ -1882,16 +1912,15 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getPartialResults
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetPartialResultsOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getPartialResults
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
-  
   SaveFBPPicks:
     Type: AWS::Serverless::Function
     Properties:
@@ -1930,28 +1959,28 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /saveFBPPicks
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         SaveFBPPicksOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /saveFBPPicks
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         ValidateAndFixFBPPicksPOST:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /validateAndFixFBPPicks
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         ValidateAndFixFBPPicksOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /validateAndFixFBPPicks
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   GetPickSheet:
     Type: AWS::Serverless::Function
@@ -1981,14 +2010,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getPickSheet
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetPickSheetOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /getPickSheet
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   GetPoolOpen:
     Type: AWS::Serverless::Function
@@ -2049,7 +2078,7 @@ Resources:
       StageName: prod
       CorsConfiguration:
         AllowOrigins:
-          - '*' # Change to your domain in production
+          - "*" # Change to your domain in production
         AllowHeaders:
           - Content-Type
           - X-Amz-Date
@@ -2089,14 +2118,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /setPoolStatusOpen
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         SetPoolStatusOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /setPoolStatusOpen
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   SetPoolStatusClosed:
     Type: AWS::Serverless::Function
@@ -2123,14 +2152,14 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /setPoolStatusClosed
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         SetPoolStatusClosedOptions:
           Type: HttpApi
           Properties:
             ApiId: !Ref FBPHttpApi
             Path: /setPoolStatusClosed
             Method: OPTIONS
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   GetFBPUser:
     Type: AWS::Serverless::Function
@@ -2157,7 +2186,7 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getFBPUserPython
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
       Layers:
         - !Ref FBPLibLayer
 
@@ -2189,7 +2218,7 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /updateFBPUser
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
       Layers:
         - !Ref FBPLibLayer
 
@@ -2221,7 +2250,7 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /addFBPUser
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
       Layers:
         - !Ref FBPLibLayer
 
@@ -2252,7 +2281,7 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getFBPPicksPython
             Method: POST
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
 
   GetAllFBPPicks:
     Type: AWS::Serverless::Function
@@ -2289,7 +2318,7 @@ Resources:
             ApiId: !Ref FBPHttpApi
             Path: /getAllFBPPicks
             Method: GET
-            PayloadFormatVersion: '2.0'
+            PayloadFormatVersion: "2.0"
         GetAllFBPPicksOptions:
           Type: HttpApi
           Properties:
@@ -2438,7 +2467,8 @@ Outputs:
     Export:
       Name: !Sub ${AWS::StackName}-EmailForwardingName
   AdvancedEmailServiceName:
-    Description: Name of the Advanced Email Service Lambda function (retained until
+    Description:
+      Name of the Advanced Email Service Lambda function (retained until
       AdvancedMessagingService is verified)
     Value: !Ref AdvancedEmailService
     Export:
