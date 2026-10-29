@@ -333,6 +333,15 @@ manifest_hash = ""
 packagetype = "Zip"
 functions = ["GenerateSpreads"]
 
+[function_build_definitions.fe6ffe14-2ca7-4321-b54a-2949ef7685fc]
+codeuri = "/Users/ccs/projects/FBP/src/SettleFinalScores/src"
+runtime = "python3.12"
+architecture = "arm64"
+handler = "SettleFinalScores.lambda_handler"
+manifest_hash = ""
+packagetype = "Zip"
+functions = ["SettleFinalScores"]
+
 [layer_build_definitions.d5f56976-a490-40f2-95a8-12c7fc390cfb]
 layer_name = "FBPLibLayer"
 codeuri = "/Users/ccs/projects/FBP/src/FBPLib-Layer"

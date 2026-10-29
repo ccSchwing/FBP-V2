@@ -1015,18 +1015,18 @@
     },
 
     {
-      "name": "Python: Local Invoke and Debug FetchFinalScores",
+      "name": "Python: Local Invoke and Debug SettleFinalScores",
       "type": "debugpy",
       "request": "attach",
       "connect": {
         "host": "localhost",
         "port": 5678
       },
-      "preLaunchTask": "Debug FetchFinalScores",
+      "preLaunchTask": "Debug SettleFinalScores",
       "postDebugTask": "Cleanup",
       "pathMappings": [
         {
-          "localRoot": "${workspaceFolder}/src/GenerateSpreads/src",
+          "localRoot": "${workspaceFolder}/src/SettleFinalScores/src",
           "remoteRoot": "/var/task"
         }
       ]
