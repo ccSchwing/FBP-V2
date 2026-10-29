@@ -324,6 +324,15 @@ manifest_hash = ""
 packagetype = "Zip"
 functions = ["BlockChainUtils"]
 
+[function_build_definitions.12fe3154-0e68-4073-9bb4-0dda829cb5c1]
+codeuri = "/Users/ccs/projects/FBP/src/GenerateSpreads/src"
+runtime = "python3.12"
+architecture = "arm64"
+handler = "GenerateSpreads.lambda_handler"
+manifest_hash = ""
+packagetype = "Zip"
+functions = ["GenerateSpreads"]
+
 [layer_build_definitions.d5f56976-a490-40f2-95a8-12c7fc390cfb]
 layer_name = "FBPLibLayer"
 codeuri = "/Users/ccs/projects/FBP/src/FBPLib-Layer"

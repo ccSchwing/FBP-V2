@@ -42,7 +42,7 @@ def importSpreadsAndFinalScores(event, context):
         response = s3.get_object(Bucket=bucket_name, Key=csvKey)
 
         dynamodb = boto3.resource('dynamodb')
-        FBP_SCHEDULE_TABLE = os.environ.get('FBPScheduleTableName')
+        FBP_SCHEDULE_TABLE = os.environ.get('FBPScheduleTableName', '2026-Schedule')
         table = dynamodb.Table(FBP_SCHEDULE_TABLE)
 
         logger.info(f"Processing file: {csvKey} from bucket: {bucket_name}")  # Log the file being processed
