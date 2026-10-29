@@ -1,0 +1,24 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /fetchFinalScores",
+  "rawPath": "/fetchFinalScores",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": "{\"week\": 7}",
+  "requestContext": {
+    "routeKey": "GET /fetchFinalScores",
+    "stage": "$default",
+    "requestId": "local-request-id",
+    "apiId": "local",
+    "http": {
+      "method": "GET",
+      "path": "/fetchFinalScores",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "sam-local"
+    }
+  },
+  "isBase64Encoded": false
+}

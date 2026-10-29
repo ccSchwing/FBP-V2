@@ -9,8 +9,19 @@ import urllib.request
 import urllib.parse
 import urllib.error
 import boto3
+from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
+from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from datetime import datetime, timezone, date, timedelta
 from fbplib.getCurrentWeek import getCurrentWeek
+
+
+cors_config = CORSConfig(
+    allow_origin="*",  # Or specify your domain like "https://yourdomain.com"
+    allow_headers=["Content-Type", "X-Amz-Date", "Authorization", "X-Api-Key", "X-Amz-Security-Token"],
+    max_age=86400,  # Cache preflight for 24 hours
+    allow_credentials=False
+)
+app = APIGatewayHttpResolver(cors=cors_config)
     
 # ── Constants ────────────────────────────────────────────────────────────────
 ODDS_API_BASE  = "https://api.the-odds-api.com/v4"
@@ -338,6 +349,7 @@ def write_to_s3(csv_content: str, week: int) -> str:
 
 
 # ── Handler ──────────────────────────────────────────────────────────────────
+@app.get("/generate-spreads")
 def lambda_handler(event, context):
     print(f"Event: {json.dumps(event)}")
 

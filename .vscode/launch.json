@@ -1014,7 +1014,23 @@
       ]
     },
 
-
+    {
+      "name": "Python: Local Invoke and Debug FetchFinalScores",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "preLaunchTask": "Debug FetchFinalScores",
+      "postDebugTask": "Cleanup",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/GenerateSpreads/src",
+          "remoteRoot": "/var/task"
+        }
+      ]
+    },
 
     {
       "name": "Python: Local Invoke and Debug GetFBPUserEmailAndDisplayName",
