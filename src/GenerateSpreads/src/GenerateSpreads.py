@@ -306,6 +306,11 @@ def build_csv(games: list, week: int) -> str:
         # extract_spread uses full names to match outcome['name'] from the API
         spread, underdog = extract_spread(game, home_full, away_full, commence)
 
+        ##
+        # if the spread does not have a fractional part, add 0.5 to it
+        if spread == int(spread):
+            spread += 0.5
+
         # convert to short names for CSV
         home = short_name(home_full)
         away = short_name(away_full)

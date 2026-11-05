@@ -827,13 +827,21 @@ Resources:
           OddsApiSecretName: !Ref OddsApiSecretName
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Policies:
-        - Statement:
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-FBP-Config"
+        - Version: "2012-10-17"
+          Statement:
             - Effect: Allow
               Action: secretsmanager:GetSecretValue
-              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:fbp/odds-api-key*"
+              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:fbp/the-odds-api*"
             - Effect: Allow
               Action: s3:PutObject
               Resource: !Sub "arn:aws:s3:::${S3BucketName}/${S3SubDir}/*"
+            - Effect: Allow
+              Action: dynamodb:Scan
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Config"
+
   SettleFinalScores:
     Type: AWS::Serverless::Function
     Properties:
@@ -853,6 +861,22 @@ Resources:
           EndzoneApiSecretName: !Ref EndzoneApiKeySecretName
           FBPConfigTableName: !Sub "${Year}-FBP-Config"
       Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Sub "${Year}-FBP-Config"
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:BatchGetItem
+                - dynamodb:BatchWriteItem
+                - dynamodb:DeleteItem
+                - dynamodb:DescribeTable
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:Query
+                - dynamodb:Scan
+                - dynamodb:UpdateItem
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Year}-FBP-Schedule"
         - Version: "2012-10-17"
           Statement:
             - Effect: Allow
@@ -928,10 +952,12 @@ Resources:
           S3BucketName: !Ref S3BucketName
           CloudFrontDomain: !Ref CloudFrontDomain
           SetPoolStatusOpen: !Ref SetPoolStatusOpen # Open pool for new week.
+          SettleFinalScores: !Ref SettleFinalScores # Settle final scores for the current week.
           CalcWeeklyResults: !Ref CalcWeeklyResults # Calc NFL Game Results for the week just ended.
           UpdateWeeklyResults: !Ref UpdateWeeklyResults # Update User results.
           ImportSpreadsAndFinalScores: !Ref ImportSpreadsAndFinalScores # Import spreads and final scores for the week.
           AdvancedMessagingService: !Ref AdvancedMessagingService # Send messages to users about new week and weekly results.
+          GenerateSpreads: !Ref GenerateSpreads
           SendEmail: !Ref SendEmail
           FBPWeeklyResultsTableName: !Sub "${Year}-FBP-Weekly-Results"
           HTMLtoPDF: !Ref HTMLtoPDF # Generate picksheet PDF.
@@ -949,7 +975,9 @@ Resources:
                 - !GetAtt AdvancedMessagingService.Arn
                 - !GetAtt SendEmail.Arn
                 - !GetAtt SetPoolStatusOpen.Arn
+                - !GetAtt SettleFinalScores.Arn
                 - !GetAtt HTMLtoPDF.Arn
+                - !GetAtt GenerateSpreads.Arn
         - DynamoDBCrudPolicy:
             TableName: !Sub "${Year}-FBP-Config"
         - DynamoDBCrudPolicy:
@@ -988,6 +1016,7 @@ Resources:
       CodeUri: src/ClosePool/src/
       Handler: ClosePool.lambda_handler
       Runtime: python3.12
+      Timeout: 90
       Layers:
         - !Ref FBPLibLayer
         - !Ref FBPBlockChainLayer

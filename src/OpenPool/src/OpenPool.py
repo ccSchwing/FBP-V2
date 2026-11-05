@@ -125,6 +125,12 @@ def openPool():
         week=str(week)
         open_pool_status_check()
         BC.add_block(data = "open_pool_status_check completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
+        ##
+        # This where you need to call SettleFinalScores before proceeding with the rest of the open pool logic.
+        # Then you have all spreads and final scores ready for import.
+        ##
+        invoke_settle_final_scores()
+        BC.add_block(data = "invoke_settle_final_scores completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         invoke_import_spreads_and_final_scores()
         BC.add_block(data = "invoke_import_spreads_and_final_scores completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         invoke_calc_weekly_results()
@@ -135,10 +141,16 @@ def openPool():
         BC.add_block(data = "invoke_update_total_correct_and_incorrect_picks completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         invoke_advanced_messaging_service()
         BC.add_block(data = "invoke_advanced_messaging_service completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
+        set_pool_open()
+        ##
+        BC.add_block(data = "set_pool_open completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
+        ##
+        # If I generate spreads here, I don't need to worry about the current week being set to last week.
+        ##
+        generate_spreads_for_new_week()
+        BC.add_block(data = "generate_spreads_for_new_week completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         import_spreads_and_final_scores_for_new_week()
         BC.add_block(data = "import_spreads_and_final_scores_for_new_week completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
-        set_pool_open()
-        BC.add_block(data = "set_pool_open completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         try:
             pdfWeek=getCurrentWeek()
             if pdfWeek is not None:
@@ -205,11 +217,66 @@ def open_pool_status_check():
         )
         raise RuntimeError(f"Error checking pool status for week {current_week}: {e}")
 
-    ##
-    # Green light.  Let's do this thing.  : -)
-    # The calcWeeklyResults calculates the NFL Game Results and sets the winner for each game.
-    ##
+##
+# Green light.  Let's do this thing.  : -)
+##
 
+##
+# Invokes the SettleFinalScores Lambda function to settle final scores for the current week.
+# This function creates the csv file in s3 that is needed to calculate the weekly results.
+##
+def invoke_settle_final_scores():
+    powertools_event = {
+        "version": "2.0",
+        "routeKey": "GET /settleFinalScores",
+        "rawPath": "/settleFinalScores",
+        "rawQueryString": "",
+        "headers": {"content-type": "application/json"},
+        "requestContext": {
+            "routeKey": "GET /settleFinalScores",
+            "stage": "$default",
+            "requestId": "local-request-id",
+            "apiId": "local",
+            "http": {
+                "method": "GET",
+                "path": "/settleFinalScores",
+                "protocol": "HTTP/1.1",
+                "sourceIp": "127.0.0.1",
+                "userAgent": "sam-local",
+            },
+        },
+        "isBase64Encoded": False,
+    }
+
+    settleFinalScoresFunction = os.environ.get(
+        "SettleFinalScores", "SettleFinalScores"
+    )
+    response = lambda_client.invoke(
+        FunctionName=settleFinalScoresFunction,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(powertools_event),
+    )
+    if response.get("StatusCode") == 200:
+        logging.info(
+            f"SettleFinalScores succeeded for the current week: {response.get('week')}."
+        )
+        fbpLog(
+            "fbpadmin@my-fbp.com",
+            "openPool",
+            f"SettleFinalScores succeeded for the current week: {response.get('week')}.",
+            "INFO",
+        )
+    else:
+        logging.error(
+            f"SettleFinalScores failed with status code: {response.get('StatusCode')}"
+        )
+        fbpLog(
+            "fbpadmin@my-fbp.com",
+            "openPool",
+            f"SettleFinalScores failed with status code: {response.get('StatusCode')}.",
+            "ERROR",
+        )
+        raise RuntimeError(f"SettleFinalScores failed with status code: {response.get('StatusCode')}")
     ##
     # You need to import the results for the week that just ended before you can calculate the weekly results, so call the ImportResults Lambda first.
     # This will import the spreads and final scores for the week that just ended, which are needed to calculate the weekly results.
@@ -636,6 +703,48 @@ def set_pool_open():
         )
         raise RuntimeError(f"SetPoolStatusOpen failed with status code: {response.get('StatusCode')}")
         ##
+def generate_spreads_for_new_week():
+    powertools_event = {
+        "version": "2.0",
+        "routeKey": "POST /generateSpreads",
+        "rawPath": "/generateSpreads",
+        "rawQueryString": "",
+        "headers": {"content-type": "application/json"},
+        "body": "",
+        "requestContext": {
+            "routeKey": "POST /generateSpreads",
+            "stage": "$default",
+            "requestId": "local-request-id",
+            "apiId": "local",
+            "http": {
+                "method": "POST",
+                "path": "/generateSpreads",
+                "protocol": "HTTP/1.1",
+                "sourceIp": "127.0.0.1",
+                "userAgent": "sam-local",
+            },
+        },
+        "isBase64Encoded": False,
+    }
+    generateSpreadsFunction = os.environ.get("GenerateSpreads", "GenerateSpreads")
+    response = lambda_client.invoke(
+        FunctionName=generateSpreadsFunction,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(powertools_event),
+    )
+    if response.get("StatusCode") == 200:
+        logging.info("GenerateSpreads succeeded for the new week.")
+        fbpLog(
+            "fbpadmin@my-fbp.com",
+            "openPool",
+            "GenerateSpreads succeeded for the new week.",
+            "INFO",
+        )
+    else:
+        logging.error(
+            f"GenerateSpreads failed with status code: {response.get('StatusCode')}"
+        )
+        raise RuntimeError(f"GenerateSpreads failed with status code: {response.get('StatusCode')}")
     ##
     # Call the ImportSpreadsAndFinalScores Lambda to import the spreads for the new week.
     # This will allow the spreads to be in place by the time the users

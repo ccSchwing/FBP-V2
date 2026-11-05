@@ -42,6 +42,7 @@ import urllib.request
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from datetime import datetime, timezone
+from fbplib.getCurrentWeek import getCurrentWeek
 
 import boto3
 
@@ -442,7 +443,11 @@ def lambda_handler(event: dict, context) -> dict:
     """Plain Lambda handler - invoke from EventBridge, Step Functions, or manually."""
     print(f"Event: {json.dumps(event)}")
 
-    week=0
+    ##
+    # set the week to current week.
+    # if there is a week specified in the event body, it will override the current week.
+    ##
+    week=getCurrentWeek()
     dry_run = False
     allow_partial = False
     if 'body' in event:
