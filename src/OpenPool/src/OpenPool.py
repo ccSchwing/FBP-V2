@@ -153,8 +153,6 @@ def openPool():
         BC.add_block(data = "import_spreads_and_final_scores_for_new_week completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         try:
             pdfWeek=getCurrentWeek()
-            if pdfWeek is not None:
-                pdfWeek = pdfWeek + 1
             pdf_result = generate_picksheet_pdf(pdfWeek)
             logging.info(f"Picksheet PDF generated: {pdf_result}")
             BC.add_block(data = "generate_picksheet_pdf completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
@@ -812,6 +810,9 @@ def import_spreads_and_final_scores_for_new_week():
 def generatePicksheetPdf():
     body = app.current_event.json_body or {}
     week = body.get("Week") or getCurrentWeek()
+    if week is None:
+        raise ValueError("Week is required")
+    week = int(week)
     result = generate_picksheet_pdf(week)
     return {"statusCode": 200, "body": json.dumps({"result": result})}
 
