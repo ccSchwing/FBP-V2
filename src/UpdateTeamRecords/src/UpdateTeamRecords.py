@@ -31,7 +31,10 @@ def _as_bool(value: str) -> bool:
 
 
 @app.get("/updateTeamRecords")
-def updateTeamRecords() -> Response:
+def updateTeamRecordsRoute():
+    return do_updateTeamRecords()
+
+def do_updateTeamRecords() -> Response:
     logger.info("Fetching team records")
     try:
         dynamodb = boto3.resource("dynamodb")
@@ -175,6 +178,15 @@ def updateTeamRecords() -> Response:
             headers={"Content-Type": "application/json"},
         )
 
-
 def lambda_handler(event, context):
-    return app.resolve(event, context)
+    # If invoked from API Gateway v2 (HTTP API), use the Powertools resolver
+    if "requestContext" in event:
+        return app.resolve(event, context)
+    
+    # Invoked directly from Step Functions or EventBridge Scheduler
+    return handle_direct_invocation(event, context)
+
+
+def handle_direct_invocation(event, context):
+    result = do_updateTeamRecords()
+    return {"statusCode": 200, "body": str(result)}

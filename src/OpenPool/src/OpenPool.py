@@ -119,7 +119,7 @@ def generate_picksheet_pdf(week):
     return result
 
 @app.get("/openPool")
-def openPool():
+def do_openPool():
     try:
         week = getCurrentWeek()
         week=str(week)
@@ -153,7 +153,9 @@ def openPool():
         BC.add_block(data = "import_spreads_and_final_scores_for_new_week completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         try:
             pdfWeek=getCurrentWeek()
-            pdf_result = generate_picksheet_pdf(pdfWeek)
+            if pdfWeek is None:
+                raise RuntimeError("Current week is not set. Cannot generate picksheet PDF.")
+            pdf_result = generate_picksheet_pdf(pdfWeek+1)
             logging.info(f"Picksheet PDF generated: {pdf_result}")
             BC.add_block(data = "generate_picksheet_pdf completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
         except Exception as e:
@@ -813,9 +815,9 @@ def generatePicksheetPdf():
     if week is None:
         raise ValueError("Week is required")
     week = int(week)
-    result = generate_picksheet_pdf(week)
+    result = generate_picksheet_pdf(week+1)
     return {"statusCode": 200, "body": json.dumps({"result": result})}
 
-
 def lambda_handler(event, context):
-    return app.resolve(event, context)
+        return app.resolve(event, context)
+    

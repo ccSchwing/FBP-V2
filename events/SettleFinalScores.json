@@ -6,7 +6,7 @@
   "headers": {
     "content-type": "application/json"
   },
-  "body": "{\"week\": \"7\"}",
+  "body": "{\"week\": \"10\"}",
   "requestContext": {
     "routeKey": "GET /settleFinalScores",
     "stage": "$default",
