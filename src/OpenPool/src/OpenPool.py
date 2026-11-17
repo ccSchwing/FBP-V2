@@ -155,12 +155,12 @@ def do_openPool():
             pdfWeek=getCurrentWeek()
             if pdfWeek is None:
                 raise RuntimeError("Current week is not set. Cannot generate picksheet PDF.")
-            pdf_result = generate_picksheet_pdf(pdfWeek+1)
+            pdf_result = generate_picksheet_pdf(pdfWeek)
             logging.info(f"Picksheet PDF generated: {pdf_result}")
-            BC.add_block(data = "generate_picksheet_pdf completed", week=week, email="fbpadmin@my-fbp.com", event="openPool")
+            BC.add_block(data = "generate_picksheet_pdf completed", week=pdfWeek, email="fbpadmin@my-fbp.com", event="openPool")
         except Exception as e:
             logging.exception(f"Error generating picksheet PDF: {e}")  # Non-fatal
-            BC.add_block(data = f"Error generating picksheet PDF: {e}", week=week, email="fbpadmin@my-fbp.com", event="openPool")
+            BC.add_block(data = f"Error generating picksheet PDF: {e}", week=pdfWeek, email="fbpadmin@my-fbp.com", event="openPool")
     except RuntimeError as e:
         logging.error(f"openPool halted: {e}")
         fbpLog("fbpadmin@my-fbp.com", "openPool", f"openPool halted: {e}", "ERROR")
@@ -815,7 +815,7 @@ def generatePicksheetPdf():
     if week is None:
         raise ValueError("Week is required")
     week = int(week)
-    result = generate_picksheet_pdf(week+1)
+    result = generate_picksheet_pdf(week)
     return {"statusCode": 200, "body": json.dumps({"result": result})}
 
 def lambda_handler(event, context):

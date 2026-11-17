@@ -4,7 +4,7 @@
   "rawPath": "/generatePicksheetPdf",
   "rawQueryString": "",
   "headers": { "content-type": "application/json" },
-  "body": "{\"Week\": \"8\"}",
+  "body": "{\"Week\": \"11\"}",
   "requestContext": {
     "routeKey": "POST /generatePicksheetPdf",
     "stage": "$default",
